@@ -1,6 +1,6 @@
 export type Language = 'python' | 'javascript' | 'java' | 'cpp';
 
-export type EditorTheme = 'dark' | 'light';
+export type EditorTheme = 'dark' | 'light' | 'contrast';
 
 export interface EditorFile {
   id: string;

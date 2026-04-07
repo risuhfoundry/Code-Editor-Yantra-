@@ -68,7 +68,7 @@ export default function SharedProjectView({ project, files }: SharedProjectViewP
             </div>
             <h1 className="mt-4 font-display text-[3rem] leading-[0.9] tracking-tight text-white">{project.title}</h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/58">
-              Read-only preview of the shared entry file. Remix it into your local editor to keep editing.
+              Read-only preview of the shared entry file. Fork it into your local editor to keep editing.
             </p>
           </div>
 
@@ -89,7 +89,7 @@ export default function SharedProjectView({ project, files }: SharedProjectViewP
               disabled={remixLoading}
             >
               {remixLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-              Remix This Project
+              Fork This Project
             </button>
           </div>
         </header>

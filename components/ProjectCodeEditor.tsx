@@ -15,9 +15,14 @@ type ProjectCodeEditorFile = {
 
 type ProjectCodeEditorProps = {
   file: ProjectCodeEditorFile | null;
-  theme: 'dark' | 'light';
+  theme: 'dark' | 'light' | 'contrast';
   errorText?: string;
   readOnly?: boolean;
+  settings?: {
+    fontSize: number;
+    minimapEnabled: boolean;
+    wordWrap: 'off' | 'on';
+  };
   onChange: (value: string) => void;
   onEditorReady?: (editorInstance: editor.IStandaloneCodeEditor | null) => void;
   onMonacoReady?: (monacoInstance: Monaco | null) => void;
@@ -26,8 +31,21 @@ type ProjectCodeEditorProps = {
 const MonacoEditor = dynamic(() => import('@monaco-editor/react').then((module) => module.default), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full items-center justify-center bg-[#08080f] text-[12px] uppercase tracking-[0.12em] text-[#374151]">
-      Loading editor...
+    <div className="h-full bg-[#08080f] p-4">
+      <div className="h-full rounded-[1.5rem] border border-[#1e1e38] bg-[#0d0d18] p-4 shadow-[0_20px_48px_rgba(0,0,0,0.24)]">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="h-3 w-28 rounded-full bg-[#1e1e38]" />
+          <div className="h-3 w-16 rounded-full bg-[#1e1e38]" />
+        </div>
+        <div className="space-y-3 font-mono text-[12px]">
+          {Array.from({ length: 10 }).map((_, index) => (
+            <div key={index} className="flex items-center gap-3">
+              <div className="h-3 w-5 rounded-full bg-[#1e1e38]" />
+              <div className="h-3 rounded-full bg-[#11112a]" style={{ width: `${42 + (index % 4) * 12}%` }} />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   ),
 });
@@ -37,6 +55,7 @@ export default function ProjectCodeEditor({
   theme,
   errorText = '',
   readOnly = false,
+  settings,
   onChange,
   onEditorReady,
   onMonacoReady,
@@ -136,6 +155,19 @@ export default function ProjectCodeEditor({
   }, [editorInstance, file?.path, readOnly]);
 
   useEffect(() => {
+    if (!editorInstance) {
+      return;
+    }
+
+    editorInstance.updateOptions({
+      fontSize: settings?.fontSize ?? editorOptions.fontSize,
+      minimap: { enabled: readOnly ? false : settings?.minimapEnabled ?? true },
+      readOnly,
+      wordWrap: settings?.wordWrap ?? 'off',
+    });
+  }, [editorInstance, readOnly, settings?.fontSize, settings?.minimapEnabled, settings?.wordWrap]);
+
+  useEffect(() => {
     if (!editorInstance || !monacoInstance) {
       return;
     }
@@ -198,10 +230,17 @@ export default function ProjectCodeEditor({
         }}
         options={{
           ...editorOptions,
-          minimap: { enabled: !readOnly },
+          minimap: { enabled: readOnly ? false : settings?.minimapEnabled ?? true },
           padding: { top: 18, bottom: 18 },
           folding: true,
           matchBrackets: 'always',
+          guides: {
+            bracketPairs: true,
+            bracketPairsHorizontal: true,
+            highlightActiveBracketPair: true,
+            highlightActiveIndentation: true,
+            indentation: true,
+          },
           renderWhitespace: 'selection',
           readOnly,
           overviewRulerBorder: false,
@@ -210,7 +249,8 @@ export default function ProjectCodeEditor({
             verticalScrollbarSize: 3,
             horizontalScrollbarSize: 3,
           },
-          wordWrap: 'off',
+          fontSize: settings?.fontSize ?? editorOptions.fontSize,
+          wordWrap: settings?.wordWrap ?? 'off',
         }}
         path={file.path}
         saveViewState

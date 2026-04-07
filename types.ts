@@ -62,6 +62,10 @@ export type EditorAssistRequest = {
   selectedText?: string;
   learnerLevel?: string;
   question: string;
+  history?: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
 };
 
 export type EditorAssistResponse = {

@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+:root[data-theme='light'],
+:root[data-theme='dark'],
+:root[data-editor-theme='light'],
+:root[data-editor-theme='dark'] {
+  color-scheme: dark;
+  --yantra-background: #1e1e1e;
+  --yantra-foreground: #d4d4d4;
+  --yantra-accent: #7c3aed;
+  --yantra-accent-soft: rgba(124, 58, 237, 0.14);
+  --yantra-muted: #858585;
+  --yantra-border: #3c3c3c;
+  --yantra-shell: #1e1e1e;
+  --yantra-panel: #1e1e1e;
+  --yantra-sidebar: #252526;
+  --yantra-tab-bar: #2d2d2d;
+  --yantra-active-tab: #1e1e1e;
+  --yantra-error: #f44747;
+  --yantra-shadow: rgba(0, 0, 0, 0);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html {
+    background: var(--yantra-background);
+  }
+
+  body {
+    margin: 0;
+    background: var(--yantra-background);
+    color: var(--yantra-foreground);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    text-rendering: optimizeLegibility;
+  }
+
+  button,
+  input,
+  textarea {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: var(--yantra-accent);
+    color: #ffffff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--yantra-background);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--yantra-border);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #4f4f4f;
+  }
+}

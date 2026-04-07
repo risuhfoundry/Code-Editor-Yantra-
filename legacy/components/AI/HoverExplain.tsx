@@ -1,3 +1,4 @@
+import type { Monaco } from '@monaco-editor/react';
 import { Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { streamHint } from '@/api/ai';
@@ -6,7 +7,9 @@ import type { editor as MonacoEditor } from 'monaco-editor';
 
 interface HoverExplainProps {
   editor: MonacoEditor.IStandaloneCodeEditor | null;
+  monaco?: Monaco | null;
   file: EditorFile | null;
+  stderr?: string;
   theme: EditorTheme;
 }
 

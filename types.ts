@@ -1,6 +1,6 @@
 import type { StudentProfile } from '@/src/features/dashboard/student-profile-model';
 
-export type EditorTemplateKey = 'python-playground' | 'web-playground';
+export type EditorTemplateKey = 'python-playground' | 'web-playground' | 'js-playground';
 
 export type EditorFileLanguage =
   | 'python'
@@ -12,7 +12,7 @@ export type EditorFileLanguage =
   | 'markdown'
   | 'plaintext';
 
-export type EditorPrimaryLanguage = 'python' | 'html';
+export type EditorPrimaryLanguage = 'python' | 'html' | 'javascript';
 
 export type EditorAuthedUser = {
   id: string;

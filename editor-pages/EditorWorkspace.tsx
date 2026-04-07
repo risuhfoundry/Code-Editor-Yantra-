@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronRight,
   Diff,
+  Files,
   Keyboard,
   Languages,
   LoaderCircle,
@@ -2641,7 +2642,7 @@ export default function EditorWorkspace({
               return (
                 <div
                   key={file.path}
-                  className={`yantra-top-tab group flex h-full items-center gap-2 px-3.5 text-[12px] ${isActive ? 'is-active' : ''}`}
+                  className={`yantra-top-tab group flex h-8 self-center items-center gap-2 px-3.5 text-[12px] ${isActive ? 'is-active' : ''}`}
                   onClick={() => handleFileSelect(file.path)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
@@ -2678,9 +2679,9 @@ export default function EditorWorkspace({
         </div>
 
         <div className="flex shrink-0 items-center gap-2 border-l border-[color:var(--border-subtle)] px-3">
-          <div className="hidden items-center gap-2 text-[10px] xl:flex">
+          <div className="yantra-toolbar-cluster hidden xl:flex">
             <span
-              className={`yantra-status-text inline-flex items-center gap-1.5 ${
+              className={`yantra-toolbar-badge inline-flex items-center gap-1.5 ${
                 saveStatus === 'error'
                   ? 'text-[var(--red)]'
                   : saveStatus === 'saving'
@@ -2701,16 +2702,12 @@ export default function EditorWorkspace({
               )}
               {saveStatusLabel}
             </span>
-            <span className="yantra-divider">|</span>
-            <span className="yantra-status-text inline-flex items-center gap-1.5">
+            <span className="yantra-toolbar-badge inline-flex items-center gap-1.5">
               <span className="inline-flex h-[5px] w-[5px] rounded-full" style={{ backgroundColor: panelStatusDotColor }} />
               {panelStatusLabel}
             </span>
             {executionTimeLabel ? (
-              <>
-                <span className="yantra-divider">|</span>
-                <span className="yantra-status-text">{executionTimeLabel}</span>
-              </>
+              <span className="yantra-toolbar-badge">{executionTimeLabel}</span>
             ) : null}
           </div>
           {devBypass ? (
@@ -2720,7 +2717,7 @@ export default function EditorWorkspace({
           ) : null}
 
           {activeFile ? (
-            <label className="hidden items-center gap-2 rounded-full border border-[color:var(--border-subtle)] bg-[var(--bg-base)] px-3 py-1.5 text-[11px] text-[var(--text-secondary)] md:flex">
+            <label className="yantra-toolbar-cluster hidden items-center gap-2 px-3 py-1.5 text-[11px] text-[var(--text-secondary)] md:flex">
               <Languages className="h-3.5 w-3.5 text-[var(--accent-glow)]" />
               <select
                 value={activeFile.language}
@@ -2740,185 +2737,189 @@ export default function EditorWorkspace({
             </label>
           ) : null}
 
-          <div ref={viewControlsRef} className="relative">
+          <div className="yantra-toolbar-cluster">
+            <div ref={viewControlsRef} className="relative">
+              <button
+                type="button"
+                className="yantra-icon-button inline-flex h-8 w-8 items-center justify-center"
+                onClick={() => setShowViewControls((current) => !current)}
+                aria-label="Open editor view controls"
+                title="Editor view controls"
+              >
+                <Settings2 className="h-4 w-4" />
+              </button>
+
+              {showViewControls ? (
+                <div
+                  className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[20rem] rounded-[1.25rem] border border-[color:var(--border-strong)] bg-[var(--bg-surface)] p-4"
+                  style={{ boxShadow: 'var(--panel-shadow)' }}
+                >
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Quick Settings</div>
+                  <div className="mt-3 grid gap-2">
+                    <button
+                      type="button"
+                      className="yantra-settings-row"
+                      onClick={() =>
+                        setEditorSettings((current) => ({
+                          ...current,
+                          wordWrap: current.wordWrap === 'on' ? 'off' : 'on',
+                        }))
+                      }
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <WrapText className="h-3.5 w-3.5" />
+                        Wrap lines
+                      </span>
+                      <span>{editorSettings.wordWrap === 'on' ? 'On' : 'Off'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="yantra-settings-row"
+                      onClick={() =>
+                        setEditorSettings((current) => ({
+                          ...current,
+                          minimapEnabled: !current.minimapEnabled,
+                        }))
+                      }
+                    >
+                      <span>Minimap</span>
+                      <span>{editorSettings.minimapEnabled ? 'On' : 'Off'}</span>
+                    </button>
+
+                    <div className="yantra-settings-row">
+                      <span>Font size</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="yantra-icon-button inline-flex h-7 w-7 items-center justify-center"
+                          onClick={() =>
+                            setEditorSettings((current) => ({
+                              ...current,
+                              fontSize: Math.max(11, current.fontSize - 1),
+                            }))
+                          }
+                          aria-label="Decrease font size"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="min-w-[2rem] text-center">{editorSettings.fontSize}</span>
+                        <button
+                          type="button"
+                          className="yantra-icon-button inline-flex h-7 w-7 items-center justify-center"
+                          onClick={() =>
+                            setEditorSettings((current) => ({
+                              ...current,
+                              fontSize: Math.min(22, current.fontSize + 1),
+                            }))
+                          }
+                          aria-label="Increase font size"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Themes</div>
+                  <div className="mt-3 grid gap-2">
+                    {THEME_OPTIONS.map((themeOption) => (
+                      <button
+                        key={themeOption.value}
+                        type="button"
+                        className={`yantra-settings-row ${editorTheme === themeOption.value ? 'is-active' : ''}`}
+                        onClick={() => setEditorTheme(themeOption.value)}
+                      >
+                        <span>{themeOption.label}</span>
+                        <span>{themeOption.description}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 grid gap-2">
+                    <button
+                      type="button"
+                      className={`yantra-settings-row ${editorViewMode === 'diff' ? 'is-active' : ''}`}
+                      onClick={() => setEditorViewMode((current) => (current === 'diff' ? 'code' : 'diff'))}
+                      disabled={!canShowDiff}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <Diff className="h-3.5 w-3.5" />
+                        Diff view
+                      </span>
+                      <span>{canShowDiff ? (editorViewMode === 'diff' ? 'On' : 'Off') : 'No changes'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="yantra-settings-row"
+                      onClick={() => {
+                        setShowShortcutSheet(true);
+                        setShowViewControls(false);
+                      }}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <Keyboard className="h-3.5 w-3.5" />
+                        Keyboard shortcuts
+                      </span>
+                      <span>Open</span>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
             <button
               type="button"
               className="yantra-icon-button inline-flex h-8 w-8 items-center justify-center"
-              onClick={() => setShowViewControls((current) => !current)}
-              aria-label="Open editor view controls"
-              title="Editor view controls"
+              onClick={() => {
+                void handleManualSave();
+              }}
+              aria-label="Save project"
+              title="Save project"
             >
-              <Settings2 className="h-4 w-4" />
+              <Save className="h-4 w-4" />
             </button>
 
-            {showViewControls ? (
-              <div
-                className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[20rem] rounded-[1.25rem] border border-[color:var(--border-strong)] bg-[var(--bg-surface)] p-4"
-                style={{ boxShadow: 'var(--panel-shadow)' }}
-              >
-                <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Quick Settings</div>
-                <div className="mt-3 grid gap-2">
-                  <button
-                    type="button"
-                    className="yantra-settings-row"
-                    onClick={() =>
-                      setEditorSettings((current) => ({
-                        ...current,
-                        wordWrap: current.wordWrap === 'on' ? 'off' : 'on',
-                      }))
-                    }
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <WrapText className="h-3.5 w-3.5" />
-                      Wrap lines
-                    </span>
-                    <span>{editorSettings.wordWrap === 'on' ? 'On' : 'Off'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="yantra-settings-row"
-                    onClick={() =>
-                      setEditorSettings((current) => ({
-                        ...current,
-                        minimapEnabled: !current.minimapEnabled,
-                      }))
-                    }
-                  >
-                    <span>Minimap</span>
-                    <span>{editorSettings.minimapEnabled ? 'On' : 'Off'}</span>
-                  </button>
-
-                  <div className="yantra-settings-row">
-                    <span>Font size</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="yantra-icon-button inline-flex h-7 w-7 items-center justify-center"
-                        onClick={() =>
-                          setEditorSettings((current) => ({
-                            ...current,
-                            fontSize: Math.max(11, current.fontSize - 1),
-                          }))
-                        }
-                        aria-label="Decrease font size"
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
-                      <span className="min-w-[2rem] text-center">{editorSettings.fontSize}</span>
-                      <button
-                        type="button"
-                        className="yantra-icon-button inline-flex h-7 w-7 items-center justify-center"
-                        onClick={() =>
-                          setEditorSettings((current) => ({
-                            ...current,
-                            fontSize: Math.min(22, current.fontSize + 1),
-                          }))
-                        }
-                        aria-label="Increase font size"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Themes</div>
-                <div className="mt-3 grid gap-2">
-                  {THEME_OPTIONS.map((themeOption) => (
-                    <button
-                      key={themeOption.value}
-                      type="button"
-                      className={`yantra-settings-row ${editorTheme === themeOption.value ? 'is-active' : ''}`}
-                      onClick={() => setEditorTheme(themeOption.value)}
-                    >
-                      <span>{themeOption.label}</span>
-                      <span>{themeOption.description}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-4 grid gap-2">
-                  <button
-                    type="button"
-                    className={`yantra-settings-row ${editorViewMode === 'diff' ? 'is-active' : ''}`}
-                    onClick={() => setEditorViewMode((current) => (current === 'diff' ? 'code' : 'diff'))}
-                    disabled={!canShowDiff}
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Diff className="h-3.5 w-3.5" />
-                      Diff view
-                    </span>
-                    <span>{canShowDiff ? (editorViewMode === 'diff' ? 'On' : 'Off') : 'No changes'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="yantra-settings-row"
-                    onClick={() => {
-                      setShowShortcutSheet(true);
-                      setShowViewControls(false);
-                    }}
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Keyboard className="h-3.5 w-3.5" />
-                      Keyboard shortcuts
-                    </span>
-                    <span>Open</span>
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          <button
-            type="button"
-            className={`yantra-run-button inline-flex items-center gap-2 px-4 text-[12px] font-semibold text-white ${
-              isRunning ? 'yantra-run-button--running' : ''
-            }`}
-            onClick={() => {
-              void handleRun();
-            }}
-            disabled={isRunning}
-          >
-            <Play className="h-3.5 w-3.5 fill-current" />
-            {runButtonLabel}
-          </button>
-
-          {isPythonProject && isRunning ? (
             <button
               type="button"
-              className="inline-flex h-8 items-center gap-2 rounded-full border border-[rgba(240,139,139,0.24)] bg-[rgba(68,20,26,0.6)] px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--red)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-              onClick={handleStopExecution}
+              className="yantra-icon-button inline-flex h-8 w-8 items-center justify-center"
+              onClick={() => {
+                void handleShare();
+              }}
+              aria-label="Share project"
+              title="Share project"
             >
-              <Pause className="h-3.5 w-3.5 fill-current" />
-              Stop
+              <Share2 className="h-4 w-4" />
             </button>
-          ) : null}
+          </div>
 
-          <button
-            type="button"
-            className="yantra-icon-button inline-flex h-8 w-8 items-center justify-center"
-            onClick={() => {
-              void handleManualSave();
-            }}
-            aria-label="Save project"
-            title="Save project"
-          >
-            <Save className="h-4 w-4" />
-          </button>
+          <div className="yantra-toolbar-cluster">
+            <button
+              type="button"
+              className={`yantra-run-button inline-flex items-center gap-2 px-4 text-[12px] font-semibold text-white ${
+                isRunning ? 'yantra-run-button--running' : ''
+              }`}
+              onClick={() => {
+                void handleRun();
+              }}
+              disabled={isRunning}
+            >
+              <Play className="h-3.5 w-3.5 fill-current" />
+              {runButtonLabel}
+            </button>
 
-          <button
-            type="button"
-            className="yantra-icon-button inline-flex h-8 w-8 items-center justify-center"
-            onClick={() => {
-              void handleShare();
-            }}
-            aria-label="Share project"
-            title="Share project"
-          >
-            <Share2 className="h-4 w-4" />
-          </button>
+            {isPythonProject && isRunning ? (
+              <button
+                type="button"
+                className="inline-flex h-8 items-center gap-2 rounded-full border border-[rgba(240,139,139,0.24)] bg-[rgba(68,20,26,0.6)] px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--red)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                onClick={handleStopExecution}
+              >
+                <Pause className="h-3.5 w-3.5 fill-current" />
+                Stop
+              </button>
+            ) : null}
+          </div>
 
           <button
             type="button"
@@ -2976,7 +2977,7 @@ export default function EditorWorkspace({
               title="Toggle explorer"
             >
               {isSidebarVisible ? <span className="yantra-rail-indicator" /> : null}
-              EX
+              <Files className="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -2988,7 +2989,7 @@ export default function EditorWorkspace({
               title={isWebProject ? 'Open preview panel' : 'Open terminal panel'}
             >
               {!panelIsCollapsed && activeBottomPanelTab === 'terminal' ? <span className="yantra-rail-indicator" /> : null}
-              OUT
+              <TerminalSquare className="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -2998,27 +2999,22 @@ export default function EditorWorkspace({
               title="Toggle AI assist"
             >
               {assistOpen ? <span className="yantra-rail-indicator" /> : null}
-              AI
+              <Sparkles className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <button
-              type="button"
-              className={`yantra-rail-button relative flex h-9 w-9 items-center justify-center ${
-                !panelIsCollapsed && activeBottomPanelTab === 'problems' ? 'is-active' : ''
-              }`}
-              onClick={() => handlePanelTabSelect('problems')}
-              aria-label="Open problems panel"
-              title="Open problems panel"
-            >
-              {!panelIsCollapsed && activeBottomPanelTab === 'problems' ? <span className="yantra-rail-indicator" /> : null}
-              ERR
-            </button>
-            <div className="yantra-rail-label flex h-9 w-9 items-center justify-center">
-              LOG
-            </div>
-          </div>
+          <button
+            type="button"
+            className={`yantra-rail-button relative flex h-9 w-9 items-center justify-center ${
+              !panelIsCollapsed && activeBottomPanelTab === 'problems' ? 'is-active' : ''
+            }`}
+            onClick={() => handlePanelTabSelect('problems')}
+            aria-label="Open problems panel"
+            title="Open problems panel"
+          >
+            {!panelIsCollapsed && activeBottomPanelTab === 'problems' ? <span className="yantra-rail-indicator" /> : null}
+            <AlertCircle className="h-4 w-4" />
+          </button>
         </nav>
 
         {isSidebarVisible ? (
@@ -3069,7 +3065,9 @@ export default function EditorWorkspace({
                     );
                   })
                 ) : (
-                  <div className="px-3 py-2 text-[12px] text-[var(--text-muted)]">No open editors.</div>
+                  <div className="px-3 py-2">
+                    <div className="yantra-empty-note">No open editors yet.</div>
+                  </div>
                 )}
               </div>
 
@@ -3094,7 +3092,7 @@ export default function EditorWorkspace({
                       aria-label="Search files"
                     />
                     <div className="mt-2 text-[11px] leading-5 text-[var(--text-muted)]">
-                      Shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+P palette, Cmd/Ctrl+H replace, ? help.
+                      Ctrl/Cmd+P opens the palette. Ctrl/Cmd+H opens replace.
                     </div>
                   </div>
 
@@ -3544,7 +3542,10 @@ export default function EditorWorkspace({
           {assistOpen ? (
             <aside className="yantra-ai-panel flex w-[320px] shrink-0 flex-col">
               <div className="flex h-11 items-center justify-between border-b border-[color:var(--border-subtle)] px-4">
-                <div className="text-[13px] font-medium text-[var(--text-primary)]">AI Assist</div>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium text-[var(--text-primary)]">Yantra Assist</div>
+                  <div className="truncate text-[10px] uppercase tracking-[0.12em] text-[var(--text-muted)]">{activeFileName}</div>
+                </div>
                 <button
                   type="button"
                   className="yantra-icon-button inline-flex h-7 w-7 items-center justify-center"
@@ -3556,21 +3557,22 @@ export default function EditorWorkspace({
                 </button>
               </div>
 
-              <div className="border-b border-[color:var(--border-subtle)] px-4 py-3 text-[12px] leading-6 text-[var(--text-secondary)]">
-                {devBypass
-                  ? 'AI assist is currently unavailable while the editor is running in local mode.'
-                  : `Copilot-style chat for ${activeFileName}. Use Ctrl/Cmd + Enter to send.`}
-              </div>
-
-              <div className="border-b border-[color:var(--border-subtle)] px-4 py-3 text-[11px] leading-5 text-[var(--text-secondary)]">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">Context</div>
-                <div className="mt-2 truncate text-[var(--text-primary)]">{activeFileName}</div>
-                <div className="truncate">{assistSelectionSummary}</div>
+              <div className="border-b border-[color:var(--border-subtle)] px-4 py-4">
+                <div className="yantra-context-card">
+                  <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">Context</div>
+                  <div className="mt-2 truncate text-[13px] font-medium text-[var(--text-primary)]">{activeFileName}</div>
+                  <div className="mt-1 text-[11px] leading-5 text-[var(--text-secondary)]">{assistSelectionSummary}</div>
+                  <div className="mt-3 text-[12px] leading-6 text-[var(--text-secondary)]">
+                    {devBypass
+                      ? 'AI assist is currently unavailable while the editor is running in local mode.'
+                      : `Ask for explanation, fixes, cleanup, or optimization. Use Ctrl/Cmd + Enter to send.`}
+                  </div>
+                </div>
               </div>
 
               <div className="border-b border-[color:var(--border-subtle)] px-4 py-3">
                 <div className="mb-2 text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">Quick prompts</div>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {ASSIST_SUGGESTIONS.map((suggestion) => (
                     <button
                       key={suggestion.label}
@@ -3590,11 +3592,7 @@ export default function EditorWorkspace({
                     {assistMessages.map((message) => (
                       <div
                         key={message.id}
-                        className={`rounded-2xl border px-3 py-3 ${
-                          message.role === 'assistant'
-                            ? 'border-[rgba(115,130,246,0.2)] bg-[rgba(115,130,246,0.1)]'
-                            : 'border-[color:var(--border-subtle)] bg-[var(--bg-panel)]'
-                        }`}
+                        className={`yantra-assist-message ${message.role === 'assistant' ? 'is-assistant' : 'is-user'}`}
                       >
                         <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
                           {message.role === 'assistant' ? 'Yantra' : 'You'}
@@ -3615,10 +3613,10 @@ export default function EditorWorkspace({
                     {assistError}
                   </div>
                 ) : (
-                  <div className="text-[var(--text-muted)]">
+                  <div className="yantra-empty-note">
                     {devBypass
                       ? 'Local mode keeps editing and execution available, but AI assist is still turned off.'
-                      : 'Ask Yantra to explain code, debug errors, or review the active file.'}
+                      : 'Start with a quick prompt or ask a focused question about the active file.'}
                   </div>
                 )}
 
@@ -3667,7 +3665,7 @@ export default function EditorWorkspace({
                   }}
                   rows={6}
                   className="yantra-ai-input w-full resize-none px-3 py-2 text-[13px]"
-                  placeholder="Ask about the active file..."
+                  placeholder="Ask Yantra about the active file..."
                 />
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <div className="min-w-0 text-[11px] text-[var(--text-muted)]">
@@ -3692,24 +3690,21 @@ export default function EditorWorkspace({
       </div>
 
       <footer className="yantra-status-bar flex shrink-0 items-center justify-between px-3">
-        <div className="flex min-w-0 items-center overflow-hidden">
+        <div className="flex min-w-0 items-center gap-2 overflow-hidden">
           <button
             type="button"
-            className="truncate hover:text-[var(--text-secondary)]"
+            className="yantra-status-link truncate"
             onClick={() => setIsSidebarVisible((current) => !current)}
           >
             {isSidebarVisible ? 'Explorer' : 'Show Explorer'}
           </button>
-          <span className="yantra-status-separator" />
           <div className="truncate text-[var(--accent-glow)]">{activeFile ? activeFile.path : 'No file open'}</div>
-          <span className="yantra-status-separator hidden sm:inline-flex" />
-          <div className="hidden sm:block">{saveStatusLabel}</div>
         </div>
 
-        <div className="flex shrink-0 items-center">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            className={`inline-flex items-center gap-1.5 hover:text-[var(--text-secondary)] ${
+            className={`yantra-status-link inline-flex items-center gap-1.5 ${
               problemEntries.length > 0 ? 'text-[var(--yellow)]' : 'text-[var(--green)]'
             }`}
             onClick={() => handlePanelTabSelect('problems')}
@@ -3719,15 +3714,13 @@ export default function EditorWorkspace({
               ? `${problemEntries.length} Problem${problemEntries.length === 1 ? '' : 's'}`
               : 'No Problems'}
           </button>
-          <span className="yantra-status-separator" />
           <button
             type="button"
-            className="hover:text-[var(--text-secondary)]"
+            className="yantra-status-link"
             onClick={() => handlePanelTabSelect('terminal')}
           >
             {panelIsCollapsed ? 'Open Panel' : isWebProject ? 'Preview' : 'Terminal'}
           </button>
-          <span className="yantra-status-separator" />
           <span className="yantra-kind-badge">{projectKindLabel}</span>
         </div>
       </footer>
@@ -4066,18 +4059,18 @@ export default function EditorWorkspace({
         }
 
         .yantra-top-tab {
-          background: transparent;
-          border-bottom: 2px solid transparent;
-          border-right: 0.5px solid var(--border-subtle);
-          border-top: 1px solid transparent;
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 85%),
+            transparent;
+          border: 0.5px solid transparent;
+          border-radius: 12px;
+          margin-right: 0.25rem;
           color: var(--text-muted);
         }
 
         .yantra-top-tab:hover {
-          background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 85%),
-            var(--bg-panel);
-          border-top-color: var(--border-subtle);
+          background: var(--bg-panel);
+          border-color: var(--border-subtle);
           color: var(--text-primary);
         }
 
@@ -4085,7 +4078,7 @@ export default function EditorWorkspace({
           background:
             linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 70%),
             var(--bg-elevated);
-          border-bottom-color: var(--accent-primary);
+          border-color: var(--border-strong);
           box-shadow: inset 0 1px 0 var(--chrome-highlight);
           color: var(--text-primary);
         }
@@ -4103,9 +4096,29 @@ export default function EditorWorkspace({
           color: var(--text-primary);
         }
 
-        .yantra-status-text,
-        .yantra-divider {
+        .yantra-toolbar-cluster {
+          align-items: center;
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 100%),
+            var(--bg-panel);
+          border: 0.5px solid var(--border-subtle);
+          border-radius: 999px;
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
+          display: inline-flex;
+          gap: 0.375rem;
+        }
+
+        .yantra-toolbar-badge {
+          align-items: center;
+          background: rgba(255, 255, 255, 0.016);
+          border: 0.5px solid rgba(255, 255, 255, 0.03);
+          border-radius: 999px;
           color: var(--text-muted);
+          display: inline-flex;
+          font-size: 10px;
+          letter-spacing: 0.04em;
+          min-height: 28px;
+          padding: 0 10px;
         }
 
         .yantra-save-banner {
@@ -4169,7 +4182,7 @@ export default function EditorWorkspace({
         .yantra-icon-button {
           background: rgba(255, 255, 255, 0.015);
           border: 0.5px solid rgba(255, 255, 255, 0.04);
-          border-radius: 8px;
+          border-radius: 999px;
           color: var(--text-secondary);
         }
 
@@ -4185,7 +4198,7 @@ export default function EditorWorkspace({
             linear-gradient(180deg, rgba(115, 130, 246, 0.14), rgba(115, 130, 246, 0.05)),
             var(--bg-panel);
           border: 0.5px solid rgba(115, 130, 246, 0.4);
-          border-radius: 6px;
+          border-radius: 999px;
           box-shadow: inset 0 1px 0 var(--chrome-highlight);
           color: var(--accent-glow);
         }
@@ -4248,21 +4261,24 @@ export default function EditorWorkspace({
           box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.015);
         }
 
-        .yantra-rail-button,
-        .yantra-rail-label {
+        .yantra-rail-button {
+          border: 0.5px solid transparent;
+          border-radius: 14px;
           color: var(--text-muted);
-          font-size: 10px;
-          font-weight: 500;
-          letter-spacing: 0.08em;
+          transition: all 0.15s ease;
         }
 
         .yantra-rail-button:hover {
-          background: rgba(255, 255, 255, 0.03);
-          color: var(--text-secondary);
+          background: var(--bg-panel);
+          border-color: var(--border-subtle);
+          color: var(--text-primary);
         }
 
         .yantra-rail-button.is-active {
-          background: var(--accent-soft);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 100%),
+            var(--accent-soft);
+          border-color: rgba(115, 130, 246, 0.24);
           color: var(--accent-glow);
         }
 
@@ -4293,8 +4309,11 @@ export default function EditorWorkspace({
         }
 
         .yantra-sidebar-group {
+          border-radius: 12px;
           color: var(--text-secondary);
           font-size: 12px;
+          margin: 0 8px;
+          padding: 10px 12px;
         }
 
         .yantra-sidebar-group:hover {
@@ -4303,14 +4322,17 @@ export default function EditorWorkspace({
         }
 
         .yantra-file-item {
-          border-left: 2px solid transparent;
+          border: 0.5px solid transparent;
+          border-radius: 12px;
           color: var(--text-secondary);
           font-size: 13px;
-          padding: 5px 12px;
+          margin: 2px 8px;
+          padding: 8px 12px;
         }
 
         .yantra-file-item:hover {
           background: var(--bg-panel);
+          border-color: rgba(255, 255, 255, 0.04);
           color: var(--text-primary);
         }
 
@@ -4318,7 +4340,7 @@ export default function EditorWorkspace({
           background:
             linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 80%),
             var(--accent-soft);
-          border-left-color: var(--accent-primary);
+          border-color: rgba(115, 130, 246, 0.22);
           color: var(--text-primary);
           font-weight: 500;
         }
@@ -4331,6 +4353,18 @@ export default function EditorWorkspace({
         .yantra-new-file-button:hover {
           background: var(--accent-soft);
           color: var(--text-primary);
+        }
+
+        .yantra-empty-note {
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 100%),
+            var(--bg-panel);
+          border: 0.5px solid var(--border-subtle);
+          border-radius: 14px;
+          color: var(--text-muted);
+          font-size: 12px;
+          line-height: 1.6;
+          padding: 12px 14px;
         }
 
         .yantra-editor-crumbbar {
@@ -4372,21 +4406,26 @@ export default function EditorWorkspace({
         }
 
         .yantra-panel-tab {
-          border-bottom: 1.5px solid transparent;
+          border: 0.5px solid transparent;
+          border-radius: 999px;
           color: var(--text-muted);
           font-size: 11px;
           font-weight: 500;
           letter-spacing: 0.06em;
+          min-height: 28px;
+          padding-inline: 10px;
           text-transform: uppercase;
         }
 
         .yantra-panel-tab:hover {
+          background: var(--bg-panel);
           color: var(--text-secondary);
         }
 
         .yantra-panel-tab.is-active {
-          border-bottom-color: var(--accent-primary);
-          color: var(--accent-glow);
+          background: var(--accent-soft);
+          border-color: rgba(115, 130, 246, 0.2);
+          color: var(--text-primary);
         }
 
         .yantra-terminal {
@@ -4425,18 +4464,50 @@ export default function EditorWorkspace({
         }
 
         .yantra-prompt-chip {
+          align-items: center;
           background: var(--bg-panel);
           border: 0.5px solid var(--border-subtle);
-          border-radius: 999px;
+          border-radius: 12px;
           box-shadow: inset 0 1px 0 var(--chrome-highlight);
           color: var(--text-secondary);
+          display: inline-flex;
           font-size: 11px;
-          padding: 6px 10px;
+          justify-content: flex-start;
+          min-height: 34px;
+          padding: 8px 10px;
+          text-align: left;
         }
 
         .yantra-prompt-chip:hover {
           border-color: var(--border-strong);
           color: var(--text-primary);
+        }
+
+        .yantra-context-card {
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 100%),
+            var(--bg-panel);
+          border: 0.5px solid var(--border-subtle);
+          border-radius: 16px;
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
+          padding: 14px;
+        }
+
+        .yantra-assist-message {
+          border: 0.5px solid var(--border-subtle);
+          border-radius: 18px;
+          padding: 12px;
+        }
+
+        .yantra-assist-message.is-assistant {
+          background:
+            linear-gradient(180deg, rgba(115, 130, 246, 0.12), rgba(115, 130, 246, 0.08)),
+            var(--bg-panel);
+          border-color: rgba(115, 130, 246, 0.24);
+        }
+
+        .yantra-assist-message.is-user {
+          background: var(--bg-panel);
         }
 
         .yantra-ai-input {
@@ -4482,15 +4553,21 @@ export default function EditorWorkspace({
           border-top: 0.5px solid var(--border-subtle);
           color: var(--text-muted);
           font-size: 10px;
-          height: 22px;
+          height: 28px;
         }
 
-        .yantra-status-separator {
-          background: var(--border-subtle);
-          display: inline-flex;
-          height: 10px;
-          margin: 0 10px;
-          width: 1px;
+        .yantra-status-link {
+          background: transparent;
+          border: 0;
+          border-radius: 999px;
+          color: inherit;
+          min-height: 22px;
+          padding: 0 8px;
+        }
+
+        .yantra-status-link:hover {
+          background: rgba(255, 255, 255, 0.03);
+          color: var(--text-primary);
         }
 
         .yantra-editor-cursor {

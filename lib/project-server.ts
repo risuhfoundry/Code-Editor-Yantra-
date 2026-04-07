@@ -1,4 +1,3 @@
-import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { hasSupabaseEnv } from '@/src/lib/supabase/env';
 import { createAnonClient, createClient } from '@/src/lib/supabase/server';
 import { getEditorProjectTemplate } from './project-templates';
@@ -38,6 +37,11 @@ type EditorProjectShareRow = {
   share_slug: string;
   created_by: string;
   created_at: string;
+};
+
+type EditorSupabaseClient = Awaited<ReturnType<typeof createClient>>;
+type EditorAuthenticatedUser = {
+  id: string;
 };
 
 function isMissingSessionError(error: unknown) {
@@ -116,7 +120,7 @@ export function getPublicEditorClient() {
   return createAnonClient();
 }
 
-export async function listOwnedEditorProjects(supabase: SupabaseClient, userId: string) {
+export async function listOwnedEditorProjects(supabase: EditorSupabaseClient, userId: string) {
   const { data, error } = await supabase
     .from('editor_projects')
     .select('*')
@@ -130,7 +134,7 @@ export async function listOwnedEditorProjects(supabase: SupabaseClient, userId: 
   return ((data as EditorProjectRow[] | null) ?? []).map(toProjectSummary);
 }
 
-export async function getOwnedEditorProjectRow(supabase: SupabaseClient, userId: string, projectId: string) {
+export async function getOwnedEditorProjectRow(supabase: EditorSupabaseClient, userId: string, projectId: string) {
   const { data, error } = await supabase
     .from('editor_projects')
     .select('*')
@@ -145,7 +149,7 @@ export async function getOwnedEditorProjectRow(supabase: SupabaseClient, userId:
   return (data as EditorProjectRow | null) ?? null;
 }
 
-export async function getEditorProjectFiles(supabase: SupabaseClient, projectId: string) {
+export async function getEditorProjectFiles(supabase: EditorSupabaseClient, projectId: string) {
   const { data, error } = await supabase
     .from('editor_project_files')
     .select('*')
@@ -161,7 +165,7 @@ export async function getEditorProjectFiles(supabase: SupabaseClient, projectId:
 }
 
 export async function getOwnedEditorProjectDetails(
-  supabase: SupabaseClient,
+  supabase: EditorSupabaseClient,
   userId: string,
   projectId: string,
 ): Promise<EditorProjectDetails | null> {
@@ -178,8 +182,8 @@ export async function getOwnedEditorProjectDetails(
 }
 
 export async function createEditorProjectWithTemplate(
-  supabase: SupabaseClient,
-  user: User,
+  supabase: EditorSupabaseClient,
+  user: EditorAuthenticatedUser,
   templateKey: EditorTemplateKey,
   title?: string,
 ) {
@@ -229,7 +233,7 @@ export async function createEditorProjectWithTemplate(
 }
 
 export async function updateOwnedEditorProjectTitle(
-  supabase: SupabaseClient,
+  supabase: EditorSupabaseClient,
   userId: string,
   projectId: string,
   title: string,
@@ -258,7 +262,7 @@ export async function updateOwnedEditorProjectTitle(
 }
 
 export async function replaceOwnedEditorProjectFiles(
-  supabase: SupabaseClient,
+  supabase: EditorSupabaseClient,
   userId: string,
   projectId: string,
   files: EditorProjectFileInput[],
@@ -299,7 +303,7 @@ export async function replaceOwnedEditorProjectFiles(
 }
 
 export async function insertEditorProjectShare(
-  supabase: SupabaseClient,
+  supabase: EditorSupabaseClient,
   projectId: string,
   createdBy: string,
   shareSlug: string,
@@ -321,7 +325,7 @@ export async function insertEditorProjectShare(
   return data as EditorProjectShareRow;
 }
 
-export async function getEditorProjectShareBySlug(supabase: SupabaseClient, shareSlug: string) {
+export async function getEditorProjectShareBySlug(supabase: EditorSupabaseClient, shareSlug: string) {
   const { data, error } = await supabase
     .from('editor_project_shares')
     .select('*')

@@ -111,6 +111,12 @@ export function getLocalEditorProject(projectId: string) {
   return projects[projectId] ?? null;
 }
 
+export function listLocalEditorProjects() {
+  return Object.values(readStoredProjects())
+    .map((projectDetails) => projectDetails.project)
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+}
+
 export function saveLocalEditorProject(projectDetails: EditorProjectDetails) {
   const projects = readStoredProjects();
 

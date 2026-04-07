@@ -1621,7 +1621,7 @@ export default function EditorWorkspace({
 
     try {
       if (devBypass) {
-        throw new Error('Share is unavailable in local dev mode. Sign in to create real share links.');
+        throw new Error('Share links are unavailable in local mode right now.');
       }
 
       if (isDirty) {
@@ -1652,7 +1652,7 @@ export default function EditorWorkspace({
     }
 
     if (devBypass) {
-      setAssistError('AI assist is unavailable in local dev mode. Sign in to use the Yantra service-backed assistant.');
+      setAssistError('AI assist is unavailable in local mode right now.');
       setAssistResponse('');
       return;
     }
@@ -2782,7 +2782,7 @@ export default function EditorWorkspace({
 
               <div className="border-b border-[color:var(--border-subtle)] px-4 py-3 text-[12px] leading-6 text-[var(--text-secondary)]">
                 {devBypass
-                  ? 'Sign in to enable Yantra AI Assist for the active file.'
+                  ? 'AI assist is currently unavailable while the editor is running in local mode.'
                   : `Copilot-style chat for ${activeFileName}. Use Ctrl/Cmd + Enter to send.`}
               </div>
 
@@ -2817,7 +2817,7 @@ export default function EditorWorkspace({
                 ) : (
                   <div className="text-[var(--text-muted)]">
                     {devBypass
-                      ? 'Sign in to ask Yantra to explain, debug, or review the active file.'
+                      ? 'Local mode keeps editing and execution available, but AI assist is still turned off.'
                       : 'Ask Yantra to explain code, debug errors, or review the active file.'}
                   </div>
                 )}

@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import SharedProjectView from './SharedProjectView';
-import { getAuthenticatedUser } from '@/src/lib/supabase/profiles';
 import { getRequestBaseUrl } from '@/editor/lib/request-origin';
 import type { EditorProjectDetails } from '@/editor/types';
 
@@ -27,21 +26,10 @@ export default async function SharedEditorProjectPage({ params }: SharePageProps
     notFound();
   }
 
-  const viewer = await getAuthenticatedUser();
-
   return (
     <SharedProjectView
-      shareSlug={resolvedParams.shareSlug}
       project={payload.project}
       files={payload.files}
-      viewer={
-        viewer
-          ? {
-              id: viewer.id,
-              email: viewer.email ?? null,
-            }
-          : null
-      }
     />
   );
 }

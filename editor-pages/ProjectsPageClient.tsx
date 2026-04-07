@@ -1,13 +1,20 @@
 'use client';
 
-import { startTransition, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, LoaderCircle, Plus, Sparkles } from 'lucide-react';
 import type { EditorProjectDetails, EditorProjectSummary, EditorTemplateKey } from '@/editor/types';
+import {
+  createLocalEditorProject,
+  listLocalEditorProjects,
+  saveLocalEditorProject,
+} from '@/editor/lib/local-dev-projects';
+import { PUBLIC_EDITOR_USER } from '@/src/lib/public-mode';
 
 type ProjectsPageClientProps = {
   initialProjects: EditorProjectSummary[];
+  devBypass?: boolean;
 };
 
 async function readJson<T>(response: Response): Promise<T> {
@@ -24,17 +31,37 @@ function formatUpdatedAt(value: string) {
   return new Date(value).toLocaleString();
 }
 
-export default function ProjectsPageClient({ initialProjects }: ProjectsPageClientProps) {
+export default function ProjectsPageClient({ initialProjects, devBypass = false }: ProjectsPageClientProps) {
   const router = useRouter();
+  const [projects, setProjects] = useState(initialProjects);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [creatingTemplate, setCreatingTemplate] = useState<EditorTemplateKey | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!devBypass) {
+      setProjects(initialProjects);
+      return;
+    }
+
+    setProjects(listLocalEditorProjects());
+  }, [devBypass, initialProjects]);
 
   async function createProject(templateKey: EditorTemplateKey) {
     setCreatingTemplate(templateKey);
     setCreateError(null);
 
     try {
+      if (devBypass) {
+        const created = saveLocalEditorProject(createLocalEditorProject(templateKey, PUBLIC_EDITOR_USER.id));
+        setProjects(listLocalEditorProjects());
+
+        startTransition(() => {
+          router.push(`/editor?projectId=${created.project.id}`);
+        });
+        return;
+      }
+
       const created = await readJson<EditorProjectDetails>(
         await fetch('/api/editor/projects', {
           method: 'POST',
@@ -65,11 +92,13 @@ export default function ProjectsPageClient({ initialProjects }: ProjectsPageClie
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 font-mono text-[10px] uppercase tracking-[0.24em] text-white/62">
               <Sparkles className="h-3.5 w-3.5" />
-              Editor Projects
+              {devBypass ? 'Local Editor Projects' : 'Editor Projects'}
             </div>
             <h1 className="mt-4 font-display text-[3rem] leading-[0.9] tracking-tight text-white">Your playgrounds</h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/58">
-              Jump back into a saved project or start a fresh Python, JavaScript, or web playground.
+              {devBypass
+                ? 'Your projects now save locally on this device. Start a fresh Python, JavaScript, or web playground whenever you want.'
+                : 'Jump back into a saved project or start a fresh Python, JavaScript, or web playground.'}
             </p>
           </div>
 
@@ -153,7 +182,7 @@ export default function ProjectsPageClient({ initialProjects }: ProjectsPageClie
         ) : null}
 
         <section className="mt-5">
-          {initialProjects.length === 0 ? (
+          {projects.length === 0 ? (
             <div className="rounded-[2rem] border border-dashed border-white/12 bg-white/[0.02] p-8 text-center text-white/62">
               <div className="font-display text-3xl tracking-tight text-white">No saved projects yet</div>
               <p className="mt-3 text-sm leading-relaxed">
@@ -162,7 +191,7 @@ export default function ProjectsPageClient({ initialProjects }: ProjectsPageClie
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {initialProjects.map((project) => (
+              {projects.map((project) => (
                 <Link
                   key={project.id}
                   href={`/editor?projectId=${project.id}`}

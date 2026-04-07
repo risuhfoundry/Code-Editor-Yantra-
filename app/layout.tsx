@@ -3,7 +3,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Yantra Code Editor',
-  description: 'Code. Run. Share. Instantly. Yantra is a blazing-fast in-browser code editor with live preview, AI assist, and remixable share links.',
+  description:
+    'Yantra is a cinematic browser-native code studio with instant runs, AI guidance, live preview, and remixable share links.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

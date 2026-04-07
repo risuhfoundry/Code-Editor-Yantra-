@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import Link from 'next/link';
@@ -54,6 +55,10 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 type WorkspaceStatus = 'loading' | 'ready' | 'error';
 type PythonRunStatus = 'idle' | 'running' | 'success' | 'error';
 type BottomPanelTab = 'terminal' | 'problems';
+type PendingFileAction =
+  | { type: 'rename'; path: string }
+  | { type: 'delete'; path: string }
+  | null;
 
 type PythonRunOutput = {
   status: PythonRunStatus;
@@ -367,6 +372,10 @@ export default function EditorWorkspace({
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [newFilePath, setNewFilePath] = useState('');
   const [newFileError, setNewFileError] = useState<string | null>(null);
+  const [pendingFileAction, setPendingFileAction] = useState<PendingFileAction>(null);
+  const [fileActionPath, setFileActionPath] = useState('');
+  const [fileActionError, setFileActionError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [activeBottomPanelTab, setActiveBottomPanelTab] = useState<BottomPanelTab>('terminal');
   const [bottomPanelHeight, setBottomPanelHeight] = useState(DEFAULT_BOTTOM_PANEL_HEIGHT);
@@ -375,6 +384,8 @@ export default function EditorWorkspace({
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const newFileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileActionInputRef = useRef<HTMLInputElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const editorColumnRef = useRef<HTMLDivElement | null>(null);
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const bottomPanelHeightRef = useRef(DEFAULT_BOTTOM_PANEL_HEIGHT);
@@ -445,6 +456,19 @@ export default function EditorWorkspace({
         ? '#f87171'
         : '#4ade80';
 
+  const filteredFiles = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return files;
+    }
+
+    return files.filter((file) => {
+      const fileName = getFileName(file.path).toLowerCase();
+      return file.path.toLowerCase().includes(normalizedQuery) || fileName.includes(normalizedQuery);
+    });
+  }, [files, searchQuery]);
+
   const dirtyFilePaths = useMemo(() => {
     const savedFileMap = new Map(savedFiles.map((file) => [file.path, file.content]));
 
@@ -505,6 +529,17 @@ export default function EditorWorkspace({
       newFileInputRef.current?.select();
     });
   }, [isCreatingFile]);
+
+  useEffect(() => {
+    if (!pendingFileAction) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      fileActionInputRef.current?.focus();
+      fileActionInputRef.current?.select();
+    });
+  }, [pendingFileAction]);
 
   useEffect(() => {
     if (!activeFilePath) {
@@ -680,6 +715,22 @@ export default function EditorWorkspace({
     };
   }, [areFilesDirty, filesSnapshot, project?.id]);
 
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirty) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
+
   async function saveProject({ includeTitle }: { includeTitle: boolean }) {
     if (!project?.id) {
       return false;
@@ -802,6 +853,24 @@ export default function EditorWorkspace({
     setIsCreatingFile(false);
     setNewFilePath('');
     setNewFileError(null);
+  }
+
+  function startRenameFile(path: string) {
+    setPendingFileAction({ type: 'rename', path });
+    setFileActionPath(path);
+    setFileActionError(null);
+  }
+
+  function startDeleteFile(path: string) {
+    setPendingFileAction({ type: 'delete', path });
+    setFileActionPath(path);
+    setFileActionError(null);
+  }
+
+  function cancelFileAction() {
+    setPendingFileAction(null);
+    setFileActionPath('');
+    setFileActionError(null);
   }
 
   function validateNewFilePath(candidatePath: string) {
@@ -975,8 +1044,128 @@ export default function EditorWorkspace({
     }
   }
 
-  async function handleManualSave() {
+  const handleManualSave = useCallback(async () => {
     await saveProject({ includeTitle: true });
+  }, [project, projectTitle, files, isTitleDirty, areFilesDirty, devBypass]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isModifierPressed = event.metaKey || event.ctrlKey;
+
+      if (isModifierPressed && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void handleManualSave();
+        return;
+      }
+
+      if (isModifierPressed && event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        setIsSidebarVisible(true);
+        window.requestAnimationFrame(() => {
+          searchInputRef.current?.focus();
+          searchInputRef.current?.select();
+        });
+        return;
+      }
+
+      if (isModifierPressed && event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        startNewFileCreation();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleManualSave]);
+
+  async function confirmFileAction() {
+    if (!pendingFileAction) {
+      return;
+    }
+
+    const targetFile = files.find((file) => file.path === pendingFileAction.path);
+
+    if (!targetFile) {
+      cancelFileAction();
+      return;
+    }
+
+    if (pendingFileAction.type === 'delete') {
+      if (files.length === 1) {
+        setFileActionError('You need at least one file in the project.');
+        return;
+      }
+
+      const nextFiles = files
+        .filter((file) => file.path !== pendingFileAction.path)
+        .map((file, index) => ({
+          ...file,
+          isEntry: file.path === pendingFileAction.path ? false : file.isEntry,
+          sortOrder: index,
+        }));
+
+      if (!nextFiles.some((file) => file.isEntry) && nextFiles[0]) {
+        nextFiles[0] = { ...nextFiles[0], isEntry: true };
+      }
+
+      setFiles(nextFiles);
+      setOpenFilePaths((currentPaths) => currentPaths.filter((path) => path !== pendingFileAction.path));
+      if (activeFilePath === pendingFileAction.path) {
+        setActiveFilePath(nextFiles[0]?.path ?? null);
+      }
+      cancelFileAction();
+      await persistFileSet(nextFiles);
+      return;
+    }
+
+    const normalizedPath = fileActionPath.trim().replace(/\\/g, '/').replace(/^\/+/, '');
+
+    if (!normalizedPath) {
+      setFileActionError('A filename is required.');
+      return;
+    }
+
+    if (
+      normalizedPath.endsWith('/') ||
+      normalizedPath.split('/').some((segment) => segment.length === 0 || segment === '.' || segment === '..')
+    ) {
+      setFileActionError('Use a valid relative file path.');
+      return;
+    }
+
+    const extension = getFileExtension(normalizedPath);
+
+    if (!SUPPORTED_NEW_FILE_EXTENSIONS.includes(extension as (typeof SUPPORTED_NEW_FILE_EXTENSIONS)[number])) {
+      setFileActionError(`Supported extensions: ${SUPPORTED_NEW_FILE_EXTENSIONS.join(', ')}`);
+      return;
+    }
+
+    if (files.some((file) => file.path.toLowerCase() === normalizedPath.toLowerCase() && file.path !== pendingFileAction.path)) {
+      setFileActionError('A file with that name already exists.');
+      return;
+    }
+
+    const nextFiles = files.map((file) =>
+      file.path === pendingFileAction.path
+        ? {
+            ...file,
+            path: normalizedPath,
+            language: getEditorLanguageFromPath(normalizedPath),
+          }
+        : file,
+    );
+
+    setFiles(nextFiles);
+    setOpenFilePaths((currentPaths) =>
+      currentPaths.map((path) => (path === pendingFileAction.path ? normalizedPath : path)),
+    );
+    if (activeFilePath === pendingFileAction.path) {
+      setActiveFilePath(normalizedPath);
+    }
+    cancelFileAction();
+    await persistFileSet(nextFiles);
   }
 
   async function handleShare() {
@@ -1517,28 +1706,117 @@ export default function EditorWorkspace({
 
               {isExplorerOpen ? (
                 <div className="mt-1">
-                  {files.map((file) => {
+                  <div className="px-3 pb-2">
+                    <input
+                      ref={searchInputRef}
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      className="yantra-title-input h-9 w-full px-3"
+                      placeholder="Search files..."
+                      aria-label="Search files"
+                    />
+                    <div className="mt-2 text-[11px] leading-5 text-[var(--text-muted)]">
+                      Shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+P search, Cmd/Ctrl+N new file.
+                    </div>
+                  </div>
+
+                  {filteredFiles.map((file) => {
                     const indicator = getEditorFileIndicator(file.path);
                     const isActive = activeFile?.path === file.path;
                     const isDirtyFile = dirtyFilePaths.has(file.path);
 
                     return (
-                      <button
+                      <div
                         key={file.path}
-                        type="button"
                         className={`yantra-file-item flex w-full items-center gap-2 text-left ${isActive ? 'is-active' : ''}`}
-                        onClick={() => handleFileSelect(file.path)}
                       >
-                        <span
-                          className="yantra-language-dot h-[7px] w-[7px]"
-                          style={{ backgroundColor: indicator.color }}
-                          title={getFileExtension(file.path).slice(1).toUpperCase() || 'FILE'}
-                        />
-                        <span className="min-w-0 flex-1 truncate">{getFileName(file.path)}</span>
-                        {isDirtyFile ? <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[#facc15]" /> : null}
-                      </button>
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                          onClick={() => handleFileSelect(file.path)}
+                        >
+                          <span
+                            className="yantra-language-dot h-[7px] w-[7px]"
+                            style={{ backgroundColor: indicator.color }}
+                            title={getFileExtension(file.path).slice(1).toUpperCase() || 'FILE'}
+                          />
+                          <span className="min-w-0 flex-1 truncate">{getFileName(file.path)}</span>
+                          {isDirtyFile ? <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[#facc15]" /> : null}
+                        </button>
+                        <div className="flex items-center gap-1 pr-2">
+                          <button
+                            type="button"
+                            className="yantra-icon-button inline-flex h-6 w-6 items-center justify-center text-[10px]"
+                            onClick={() => startRenameFile(file.path)}
+                            title="Rename file"
+                            aria-label={`Rename ${getFileName(file.path)}`}
+                          >
+                            R
+                          </button>
+                          <button
+                            type="button"
+                            className="yantra-icon-button inline-flex h-6 w-6 items-center justify-center text-[10px]"
+                            onClick={() => startDeleteFile(file.path)}
+                            title="Delete file"
+                            aria-label={`Delete ${getFileName(file.path)}`}
+                          >
+                            D
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
+
+                  {pendingFileAction ? (
+                    <div className="px-6 py-2">
+                      {pendingFileAction.type === 'rename' ? (
+                        <>
+                          <input
+                            ref={fileActionInputRef}
+                            value={fileActionPath}
+                            onChange={(event) => {
+                              setFileActionPath(event.target.value);
+                              setFileActionError(null);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault();
+                                void confirmFileAction();
+                              }
+
+                              if (event.key === 'Escape') {
+                                event.preventDefault();
+                                cancelFileAction();
+                              }
+                            }}
+                            className="yantra-title-input h-9 w-full px-3"
+                            aria-label="Rename file"
+                          />
+                          <div className="mt-2 flex items-center gap-2">
+                            <button type="button" className="yantra-new-file-button flex h-8 items-center gap-2 px-2.5" onClick={() => void confirmFileAction()}>
+                              Rename
+                            </button>
+                            <button type="button" className="yantra-icon-button inline-flex h-8 items-center justify-center px-3" onClick={cancelFileAction}>
+                              Cancel
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-[12px] text-[var(--text-primary)]">Delete {getFileName(pendingFileAction.path)}?</div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <button type="button" className="yantra-new-file-button flex h-8 items-center gap-2 px-2.5" onClick={() => void confirmFileAction()}>
+                              Delete
+                            </button>
+                            <button type="button" className="yantra-icon-button inline-flex h-8 items-center justify-center px-3" onClick={cancelFileAction}>
+                              Cancel
+                            </button>
+                          </div>
+                        </>
+                      )}
+                      {fileActionError ? <div className="mt-2 text-[11px] leading-5 text-[var(--red)]">{fileActionError}</div> : null}
+                    </div>
+                  ) : null}
 
                   {isCreatingFile ? (
                     <div className="px-6 py-2">
@@ -1846,7 +2124,7 @@ export default function EditorWorkspace({
                 <textarea
                   value={assistQuestion}
                   onChange={(event) => setAssistQuestion(event.target.value)}
-                  onKeyDown={(event) => {
+                  onKeyDown={(event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
                     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
                       event.preventDefault();
                       void handleAssist();

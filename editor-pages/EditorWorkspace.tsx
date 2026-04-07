@@ -618,10 +618,18 @@ function getThemeVariables(theme: EditorThemeMode) {
         '--bg-surface': '#ffffff',
         '--bg-elevated': '#eef2ff',
         '--bg-overlay': '#e8eefc',
+        '--bg-panel': '#f7f9ff',
+        '--bg-panel-alt': '#eef3ff',
+        '--bg-terminal': '#f3f6fd',
         '--border-subtle': '#d6dbe8',
+        '--border-strong': '#bcc7de',
         '--border-accent': '#4f46e5',
         '--accent-primary': '#4f46e5',
         '--accent-glow': '#4338ca',
+        '--accent-soft': 'rgba(79, 70, 229, 0.12)',
+        '--accent-strong': 'rgba(79, 70, 229, 0.22)',
+        '--chrome-highlight': 'rgba(255, 255, 255, 0.72)',
+        '--panel-shadow': '0 20px 56px rgba(15, 23, 42, 0.12)',
         '--text-primary': '#0f172a',
         '--text-secondary': '#334155',
         '--text-muted': '#64748b',
@@ -635,10 +643,18 @@ function getThemeVariables(theme: EditorThemeMode) {
         '--bg-surface': '#030712',
         '--bg-elevated': '#111827',
         '--bg-overlay': '#0f172a',
+        '--bg-panel': '#050816',
+        '--bg-panel-alt': '#0b1120',
+        '--bg-terminal': '#000000',
         '--border-subtle': '#334155',
+        '--border-strong': '#facc15',
         '--border-accent': '#facc15',
         '--accent-primary': '#facc15',
         '--accent-glow': '#fde68a',
+        '--accent-soft': 'rgba(250, 204, 21, 0.16)',
+        '--accent-strong': 'rgba(250, 204, 21, 0.3)',
+        '--chrome-highlight': 'rgba(255, 255, 255, 0.08)',
+        '--panel-shadow': '0 20px 56px rgba(0, 0, 0, 0.58)',
         '--text-primary': '#ffffff',
         '--text-secondary': '#e2e8f0',
         '--text-muted': '#93c5fd',
@@ -648,20 +664,28 @@ function getThemeVariables(theme: EditorThemeMode) {
       } as const;
     default:
       return {
-        '--bg-base': '#08080f',
-        '--bg-surface': '#0d0d18',
-        '--bg-elevated': '#11112a',
-        '--bg-overlay': '#1a1a35',
-        '--border-subtle': '#1e1e38',
-        '--border-accent': '#6366f1',
-        '--accent-primary': '#6366f1',
-        '--accent-glow': '#818cf8',
-        '--text-primary': '#e2e8f0',
-        '--text-secondary': '#6b7280',
-        '--text-muted': '#374151',
-        '--green': '#4ade80',
-        '--red': '#f87171',
-        '--yellow': '#facc15',
+        '--bg-base': '#04070d',
+        '--bg-surface': '#090d14',
+        '--bg-elevated': '#101722',
+        '--bg-overlay': '#141b28',
+        '--bg-panel': '#0b1018',
+        '--bg-panel-alt': '#0f1520',
+        '--bg-terminal': '#05070c',
+        '--border-subtle': '#192131',
+        '--border-strong': '#263146',
+        '--border-accent': '#44506b',
+        '--accent-primary': '#7382f6',
+        '--accent-glow': '#c7d0ff',
+        '--accent-soft': 'rgba(115, 130, 246, 0.14)',
+        '--accent-strong': 'rgba(115, 130, 246, 0.28)',
+        '--chrome-highlight': 'rgba(255, 255, 255, 0.04)',
+        '--panel-shadow': '0 24px 80px rgba(0, 0, 0, 0.46)',
+        '--text-primary': '#e8edf8',
+        '--text-secondary': '#93a0b7',
+        '--text-muted': '#566175',
+        '--green': '#86e0a8',
+        '--red': '#f08b8b',
+        '--yellow': '#f0c96a',
       } as const;
   }
 }
@@ -2461,39 +2485,39 @@ export default function EditorWorkspace({
     return (
       <main
         className="flex h-screen items-center justify-center px-6"
-        style={{ backgroundColor: '#08080f', color: '#e2e8f0', fontFamily: 'Inter, Geist, system-ui, sans-serif' }}
+        style={{ backgroundColor: '#04070d', color: '#e8edf8', fontFamily: 'Inter, Geist, system-ui, sans-serif' }}
       >
         <div
           className="w-full max-w-5xl overflow-hidden rounded-[2rem] border shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
-          style={{ borderColor: '#1e1e38', backgroundColor: '#0d0d18' }}
+          style={{ borderColor: '#192131', background: 'linear-gradient(180deg, rgba(255,255,255,0.02), transparent), #090d14' }}
         >
-          <div className="flex h-11 items-center justify-between border-b px-5" style={{ borderColor: '#1e1e38' }}>
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.12em]" style={{ color: '#818cf8' }}>
+          <div className="flex h-11 items-center justify-between border-b px-5" style={{ borderColor: '#192131' }}>
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.12em]" style={{ color: '#c7d0ff' }}>
               <LoaderCircle className="h-4 w-4 animate-spin" />
               Loading editor workspace
             </div>
-            <div className="h-2 w-24 rounded-full bg-[#1e1e38]" />
+            <div className="h-2 w-24 rounded-full bg-[#192131]" />
           </div>
           <div className="grid min-h-[32rem] md:grid-cols-[220px_1fr]">
-            <div className="border-r p-4" style={{ borderColor: '#1e1e38' }}>
-              <div className="h-3 w-20 rounded-full bg-[#1e1e38]" />
+            <div className="border-r p-4" style={{ borderColor: '#192131' }}>
+              <div className="h-3 w-20 rounded-full bg-[#192131]" />
               <div className="mt-4 space-y-3">
                 {Array.from({ length: 6 }).map((_, index) => (
-                  <div key={index} className="h-9 rounded-xl bg-[#11112a]" />
+                  <div key={index} className="h-9 rounded-xl bg-[#0f1520]" />
                 ))}
               </div>
             </div>
             <div className="flex flex-col">
-              <div className="border-b p-4" style={{ borderColor: '#1e1e38' }}>
-                <div className="h-3 w-40 rounded-full bg-[#1e1e38]" />
+              <div className="border-b p-4" style={{ borderColor: '#192131' }}>
+                <div className="h-3 w-40 rounded-full bg-[#192131]" />
               </div>
               <div className="flex-1 p-4">
-                <div className="h-full rounded-[1.5rem] bg-[#08080f] p-4">
+                <div className="h-full rounded-[1.5rem] bg-[#05070c] p-4">
                   <div className="space-y-3 font-mono text-[12px]">
                     {Array.from({ length: 12 }).map((_, index) => (
                       <div key={index} className="flex items-center gap-3">
-                        <div className="h-3 w-5 rounded-full bg-[#1e1e38]" />
-                        <div className="h-3 rounded-full bg-[#11112a]" style={{ width: `${40 + (index % 5) * 10}%` }} />
+                        <div className="h-3 w-5 rounded-full bg-[#192131]" />
+                        <div className="h-3 rounded-full bg-[#0f1520]" style={{ width: `${40 + (index % 5) * 10}%` }} />
                       </div>
                     ))}
                   </div>
@@ -2510,15 +2534,15 @@ export default function EditorWorkspace({
     return (
       <main
         className="flex h-screen items-center justify-center px-6"
-        style={{ backgroundColor: '#08080f', color: '#e2e8f0', fontFamily: 'Inter, Geist, system-ui, sans-serif' }}
+        style={{ backgroundColor: '#04070d', color: '#e8edf8', fontFamily: 'Inter, Geist, system-ui, sans-serif' }}
       >
-        <div className="w-full max-w-xl rounded-2xl border p-6 shadow-[0_28px_90px_rgba(0,0,0,0.52)]" style={{ borderColor: '#1e1e38', backgroundColor: '#0d0d18' }}>
-          <div className="text-[11px] font-medium uppercase tracking-[0.16em]" style={{ color: '#818cf8' }}>Editor unavailable</div>
-          <p className="mt-4 text-sm leading-6" style={{ color: '#e2e8f0' }}>{workspaceError || 'Unable to load the editor.'}</p>
+        <div className="w-full max-w-xl rounded-2xl border p-6 shadow-[0_28px_90px_rgba(0,0,0,0.52)]" style={{ borderColor: '#192131', background: 'linear-gradient(180deg, rgba(255,255,255,0.02), transparent), #090d14' }}>
+          <div className="text-[11px] font-medium uppercase tracking-[0.16em]" style={{ color: '#c7d0ff' }}>Editor unavailable</div>
+          <p className="mt-4 text-sm leading-6" style={{ color: '#e8edf8' }}>{workspaceError || 'Unable to load the editor.'}</p>
           <button
             type="button"
             className="mt-6 inline-flex h-9 items-center rounded-full px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-white"
-            style={{ backgroundColor: '#4f46e5' }}
+            style={{ background: 'linear-gradient(135deg, #7280f4 0%, #6270dd 100%)' }}
             onClick={() => window.location.reload()}
           >
             Reload
@@ -2728,7 +2752,10 @@ export default function EditorWorkspace({
             </button>
 
             {showViewControls ? (
-              <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[20rem] rounded-[1.25rem] border border-[color:var(--border-subtle)] bg-[var(--bg-surface)] p-4 shadow-[0_22px_60px_rgba(0,0,0,0.42)]">
+              <div
+                className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[20rem] rounded-[1.25rem] border border-[color:var(--border-strong)] bg-[var(--bg-surface)] p-4"
+                style={{ boxShadow: 'var(--panel-shadow)' }}
+              >
                 <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Quick Settings</div>
                 <div className="mt-3 grid gap-2">
                   <button
@@ -2861,7 +2888,7 @@ export default function EditorWorkspace({
           {isPythonProject && isRunning ? (
             <button
               type="button"
-              className="inline-flex h-8 items-center gap-2 rounded-full border border-[rgba(248,113,113,0.28)] bg-[rgba(127,29,29,0.22)] px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--red)]"
+              className="inline-flex h-8 items-center gap-2 rounded-full border border-[rgba(240,139,139,0.24)] bg-[rgba(68,20,26,0.6)] px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--red)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
               onClick={handleStopExecution}
             >
               <Pause className="h-3.5 w-3.5 fill-current" />
@@ -3341,7 +3368,7 @@ export default function EditorWorkspace({
                 />
 
                 <div className="flex h-full flex-col pt-1">
-                  <div className="flex h-10 items-center justify-between border-b border-[color:var(--border-subtle)] bg-[#060609] px-3">
+                  <div className="flex h-10 items-center justify-between border-b border-[color:var(--border-subtle)] bg-[var(--bg-terminal)] px-3">
                     <div className="flex h-full items-stretch">
                       {panelTabs.map((tab) => {
                         const isActive = activeBottomPanelTab === tab.id;
@@ -3381,7 +3408,7 @@ export default function EditorWorkspace({
                   <div className="min-h-0 flex-1 overflow-hidden">
                     {activeBottomPanelTab === 'terminal' ? (
                       isWebProject ? (
-                        <div className="h-full bg-[#060609]">
+                        <div className="h-full bg-[var(--bg-terminal)]">
                           {previewSrcDoc ? (
                             <iframe
                               title="Yantra web playground preview"
@@ -3390,21 +3417,24 @@ export default function EditorWorkspace({
                               srcDoc={previewSrcDoc}
                             />
                           ) : (
-                            <div className="flex h-full items-center justify-center bg-[#060609] px-6 text-[13px] text-[var(--text-muted)]">
+                            <div className="flex h-full items-center justify-center bg-[var(--bg-terminal)] px-6 text-[13px] text-[var(--text-muted)]">
                               Run the web playground to generate the live preview.
                             </div>
                           )}
                         </div>
                       ) : (
-                        <div className="flex h-full min-h-0 flex-col bg-[#060609]">
+                        <div className="flex h-full min-h-0 flex-col bg-[var(--bg-terminal)]">
                           <div className="shrink-0 border-b border-[color:var(--border-subtle)] px-4 py-3">
                             {isPythonProject && pythonRuntimeProgress ? (
-                              <div className="mb-3 overflow-hidden rounded-xl border border-[color:var(--border-subtle)] bg-[rgba(15,23,42,0.28)] px-4 py-3">
+                              <div
+                                className="mb-3 overflow-hidden rounded-xl border border-[color:var(--border-subtle)] bg-[var(--bg-panel)] px-4 py-3"
+                                style={{ boxShadow: 'inset 0 1px 0 var(--chrome-highlight)' }}
+                              >
                                 <div className="flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
                                   <span>Pyodide status</span>
                                   <span>{pythonRuntimeProgress.message}</span>
                                 </div>
-                                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.06)]">
+                                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.05)]">
                                   <div
                                     className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300"
                                     style={{ width: `${pythonProgressPercent}%` }}
@@ -3413,7 +3443,10 @@ export default function EditorWorkspace({
                               </div>
                             ) : null}
 
-                            <section className="overflow-hidden rounded-md border border-[color:var(--border-subtle)] bg-[rgba(15,23,42,0.28)]">
+                            <section
+                              className="overflow-hidden rounded-md border border-[color:var(--border-subtle)] bg-[var(--bg-panel)]"
+                              style={{ boxShadow: 'inset 0 1px 0 var(--chrome-highlight)' }}
+                            >
                               <button
                                 type="button"
                                 className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
@@ -3439,7 +3472,7 @@ export default function EditorWorkspace({
                                     onChange={(event) => setStdin(event.target.value)}
                                     rows={3}
                                     placeholder={'Example:\nAlice\n42'}
-                                    className="w-full resize-none rounded-md border border-[color:var(--border-subtle)] bg-[#0b1020] px-3 py-3 font-mono text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)]"
+                                    className="w-full resize-none rounded-md border border-[color:var(--border-subtle)] bg-[var(--bg-panel-alt)] px-3 py-3 font-mono text-sm text-[var(--text-primary)] outline-none transition focus:border-[color:var(--border-strong)]"
                                   />
                                   {stdin.length > 0 ? (
                                     <div className="mt-2 text-[11px] text-[var(--text-muted)]">
@@ -3476,7 +3509,7 @@ export default function EditorWorkspace({
                         </div>
                       )
                     ) : (
-                      <div className="h-full overflow-auto bg-[#060609] py-2">
+                      <div className="h-full overflow-auto bg-[var(--bg-terminal)] py-2">
                         {problemEntries.length > 0 ? (
                           problemEntries.map((problem) => (
                             <button
@@ -3559,8 +3592,8 @@ export default function EditorWorkspace({
                         key={message.id}
                         className={`rounded-2xl border px-3 py-3 ${
                           message.role === 'assistant'
-                            ? 'border-[rgba(99,102,241,0.18)] bg-[rgba(99,102,241,0.08)]'
-                            : 'border-[color:var(--border-subtle)] bg-[rgba(255,255,255,0.02)]'
+                            ? 'border-[rgba(115,130,246,0.2)] bg-[rgba(115,130,246,0.1)]'
+                            : 'border-[color:var(--border-subtle)] bg-[var(--bg-panel)]'
                         }`}
                       >
                         <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
@@ -3853,27 +3886,39 @@ export default function EditorWorkspace({
         }
 
         .yantra-shell {
-          --bg-base: #08080f;
-          --bg-surface: #0d0d18;
-          --bg-elevated: #11112a;
-          --bg-overlay: #1a1a35;
-          --border-subtle: #1e1e38;
-          --border-accent: #6366f1;
-          --accent-primary: #6366f1;
-          --accent-glow: #818cf8;
-          --text-primary: #e2e8f0;
-          --text-secondary: #6b7280;
-          --text-muted: #374151;
-          --green: #4ade80;
-          --red: #f87171;
-          --yellow: #facc15;
-          background: var(--bg-base);
+          --bg-base: #04070d;
+          --bg-surface: #090d14;
+          --bg-elevated: #101722;
+          --bg-overlay: #141b28;
+          --bg-panel: #0b1018;
+          --bg-panel-alt: #0f1520;
+          --bg-terminal: #05070c;
+          --border-subtle: #192131;
+          --border-strong: #263146;
+          --border-accent: #44506b;
+          --accent-primary: #7382f6;
+          --accent-glow: #c7d0ff;
+          --accent-soft: rgba(115, 130, 246, 0.14);
+          --accent-strong: rgba(115, 130, 246, 0.28);
+          --chrome-highlight: rgba(255, 255, 255, 0.04);
+          --panel-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+          --text-primary: #e8edf8;
+          --text-secondary: #93a0b7;
+          --text-muted: #566175;
+          --green: #86e0a8;
+          --red: #f08b8b;
+          --yellow: #f0c96a;
+          background:
+            radial-gradient(circle at top center, rgba(99, 102, 241, 0.08), transparent 28%),
+            radial-gradient(circle at 82% 16%, rgba(148, 163, 184, 0.06), transparent 22%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 18%),
+            var(--bg-base);
           color: var(--text-primary);
           font-family: Inter, Geist, system-ui, sans-serif;
         }
 
         .yantra-shell ::selection {
-          background: rgba(99, 102, 241, 0.2);
+          background: var(--accent-strong);
           color: #ffffff;
         }
 
@@ -3890,9 +3935,11 @@ export default function EditorWorkspace({
         }
 
         .yantra-command-palette {
-          background: linear-gradient(180deg, rgba(17, 17, 42, 0.98), rgba(13, 13, 24, 0.98));
-          border-color: var(--border-subtle);
-          box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 16%),
+            linear-gradient(180deg, rgba(15, 20, 31, 0.98), rgba(8, 12, 18, 0.98));
+          border-color: var(--border-strong);
+          box-shadow: var(--panel-shadow), inset 0 1px 0 var(--chrome-highlight);
         }
 
         .yantra-command-palette-input {
@@ -3914,7 +3961,7 @@ export default function EditorWorkspace({
 
         .yantra-command-item:hover,
         .yantra-command-item.is-active {
-          background: rgba(99, 102, 241, 0.08);
+          background: var(--accent-soft);
           color: var(--text-primary);
         }
 
@@ -3942,8 +3989,11 @@ export default function EditorWorkspace({
         }
 
         .yantra-header {
-          background: var(--bg-surface);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 60%),
+            var(--bg-surface);
           border-bottom: 0.5px solid var(--border-subtle);
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
         }
 
         .yantra-back-link {
@@ -3966,9 +4016,12 @@ export default function EditorWorkspace({
 
         .yantra-brand-pill {
           align-items: center;
-          border: 0.5px solid var(--accent-primary);
+          border: 0.5px solid rgba(115, 130, 246, 0.32);
           border-radius: 20px;
-          background: #1a1a35;
+          background:
+            linear-gradient(180deg, rgba(115, 130, 246, 0.14), rgba(115, 130, 246, 0.05)),
+            var(--bg-panel);
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
           color: var(--accent-glow);
           font-size: 11px;
           font-weight: 500;
@@ -3994,9 +4047,10 @@ export default function EditorWorkspace({
         }
 
         .yantra-title-input {
-          background: var(--bg-base);
-          border: 0.5px solid var(--accent-primary);
+          background: var(--bg-panel);
+          border: 0.5px solid var(--border-strong);
           border-radius: 10px;
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
           color: var(--text-primary);
           font-size: 12px;
           outline: none;
@@ -4012,6 +4066,7 @@ export default function EditorWorkspace({
         }
 
         .yantra-top-tab {
+          background: transparent;
           border-bottom: 2px solid transparent;
           border-right: 0.5px solid var(--border-subtle);
           border-top: 1px solid transparent;
@@ -4019,15 +4074,20 @@ export default function EditorWorkspace({
         }
 
         .yantra-top-tab:hover {
-          background: #0d0d20;
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 85%),
+            var(--bg-panel);
           border-top-color: var(--border-subtle);
           color: var(--text-primary);
         }
 
         .yantra-top-tab.is-active {
-          background: var(--bg-elevated);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 70%),
+            var(--bg-elevated);
           border-bottom-color: var(--accent-primary);
-          color: var(--accent-glow);
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
+          color: var(--text-primary);
         }
 
         .yantra-tab-close {
@@ -4068,7 +4128,7 @@ export default function EditorWorkspace({
         .yantra-local-badge {
           border: 0.5px solid var(--green);
           border-radius: 999px;
-          background: #0a1a0a;
+          background: rgba(17, 50, 34, 0.72);
           color: var(--green);
           font-size: 10px;
           font-weight: 500;
@@ -4078,8 +4138,12 @@ export default function EditorWorkspace({
 
         .yantra-run-button {
           align-items: center;
-          background: #4f46e5;
+          background: linear-gradient(135deg, #7280f4 0%, #6573e3 56%, #5664ca 100%);
+          border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 999px;
+          box-shadow:
+            0 12px 28px rgba(58, 70, 180, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.16);
           color: #ffffff;
           height: 30px;
           letter-spacing: 0.06em;
@@ -4087,8 +4151,10 @@ export default function EditorWorkspace({
         }
 
         .yantra-run-button:hover {
-          background: #4338ca;
-          box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
+          background: linear-gradient(135deg, #7a87f8 0%, #6a77e6 58%, #5965cf 100%);
+          box-shadow:
+            0 18px 34px rgba(58, 70, 180, 0.34),
+            inset 0 1px 0 rgba(255, 255, 255, 0.18);
         }
 
         .yantra-run-button:disabled {
@@ -4101,29 +4167,35 @@ export default function EditorWorkspace({
         }
 
         .yantra-icon-button {
-          background: transparent;
-          border: 0.5px solid transparent;
+          background: rgba(255, 255, 255, 0.015);
+          border: 0.5px solid rgba(255, 255, 255, 0.04);
           border-radius: 8px;
           color: var(--text-secondary);
         }
 
         .yantra-icon-button:hover {
-          background: var(--bg-elevated);
-          border-color: var(--border-subtle);
+          background: var(--bg-panel);
+          border-color: var(--border-strong);
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
           color: var(--text-primary);
         }
 
         .yantra-ai-button {
-          background: #1a0a3a;
-          border: 0.5px solid var(--accent-primary);
+          background:
+            linear-gradient(180deg, rgba(115, 130, 246, 0.14), rgba(115, 130, 246, 0.05)),
+            var(--bg-panel);
+          border: 0.5px solid rgba(115, 130, 246, 0.4);
           border-radius: 6px;
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
           color: var(--accent-glow);
         }
 
         .yantra-ai-button:hover,
         .yantra-ai-button.is-active {
-          background: #251550;
-          box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.18);
+          background:
+            linear-gradient(180deg, rgba(115, 130, 246, 0.2), rgba(115, 130, 246, 0.08)),
+            var(--bg-panel-alt);
+          box-shadow: inset 0 0 0 1px rgba(115, 130, 246, 0.18);
         }
 
         .yantra-toolbar-select {
@@ -4143,9 +4215,12 @@ export default function EditorWorkspace({
 
         .yantra-settings-row {
           align-items: center;
-          background: var(--bg-base);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01)),
+            var(--bg-panel);
           border: 0.5px solid var(--border-subtle);
           border-radius: 12px;
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
           color: var(--text-secondary);
           display: flex;
           font-size: 12px;
@@ -4158,13 +4233,19 @@ export default function EditorWorkspace({
 
         .yantra-settings-row:hover,
         .yantra-settings-row.is-active {
-          border-color: var(--accent-primary);
+          border-color: var(--border-strong);
+          box-shadow:
+            inset 0 1px 0 var(--chrome-highlight),
+            0 0 0 1px var(--accent-soft);
           color: var(--text-primary);
         }
 
         .yantra-rail {
-          background: var(--bg-base);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 16%),
+            var(--bg-terminal);
           border-right: 0.5px solid var(--border-subtle);
+          box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.015);
         }
 
         .yantra-rail-button,
@@ -4176,12 +4257,12 @@ export default function EditorWorkspace({
         }
 
         .yantra-rail-button:hover {
-          background: rgba(255, 255, 255, 0.02);
+          background: rgba(255, 255, 255, 0.03);
           color: var(--text-secondary);
         }
 
         .yantra-rail-button.is-active {
-          background: rgba(99, 102, 241, 0.04);
+          background: var(--accent-soft);
           color: var(--accent-glow);
         }
 
@@ -4196,8 +4277,11 @@ export default function EditorWorkspace({
         }
 
         .yantra-sidebar {
-          background: var(--bg-surface);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 18%),
+            var(--bg-surface);
           border-right: 0.5px solid var(--border-subtle);
+          box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.015);
         }
 
         .yantra-section-label {
@@ -4214,7 +4298,7 @@ export default function EditorWorkspace({
         }
 
         .yantra-sidebar-group:hover {
-          background: #0d0d1e;
+          background: var(--bg-panel);
           color: var(--text-primary);
         }
 
@@ -4226,14 +4310,16 @@ export default function EditorWorkspace({
         }
 
         .yantra-file-item:hover {
-          background: #0d0d1e;
+          background: var(--bg-panel);
           color: var(--text-primary);
         }
 
         .yantra-file-item.is-active {
-          background: var(--bg-elevated);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 80%),
+            var(--accent-soft);
           border-left-color: var(--accent-primary);
-          color: var(--accent-glow);
+          color: var(--text-primary);
           font-weight: 500;
         }
 
@@ -4243,28 +4329,35 @@ export default function EditorWorkspace({
         }
 
         .yantra-new-file-button:hover {
-          background: rgba(99, 102, 241, 0.04);
-          color: var(--accent-glow);
+          background: var(--accent-soft);
+          color: var(--text-primary);
         }
 
         .yantra-editor-crumbbar {
-          background: var(--bg-surface);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 70%),
+            var(--bg-surface);
           border-bottom: 0.5px solid var(--border-subtle);
         }
 
         .yantra-kind-badge {
-          background: #1a1a35;
-          border: 0.5px solid var(--border-accent);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 100%),
+            var(--bg-panel);
+          border: 0.5px solid var(--border-strong);
           border-radius: 4px;
-          color: var(--accent-glow);
+          color: var(--text-primary);
           display: inline-flex;
           padding: 1px 8px;
         }
 
         .yantra-collapsed-panel {
-          background: var(--bg-surface);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 100%),
+            var(--bg-panel);
           border: 0.5px solid var(--border-subtle);
           border-radius: 999px;
+          box-shadow: var(--panel-shadow);
           color: var(--text-secondary);
         }
 
@@ -4274,7 +4367,7 @@ export default function EditorWorkspace({
         }
 
         .yantra-bottom-panel {
-          background: #060609;
+          background: var(--bg-terminal);
           border-top: 0.5px solid var(--border-subtle);
         }
 
@@ -4297,7 +4390,7 @@ export default function EditorWorkspace({
         }
 
         .yantra-terminal {
-          background: #060609;
+          background: var(--bg-terminal);
           font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
           font-size: 12px;
           line-height: 1.7;
@@ -4320,32 +4413,37 @@ export default function EditorWorkspace({
         }
 
         .yantra-problem-row:hover {
-          background: rgba(99, 102, 241, 0.06);
+          background: var(--accent-soft);
         }
 
         .yantra-ai-panel {
-          background: var(--bg-surface);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 18%),
+            var(--bg-surface);
           border-left: 0.5px solid var(--border-subtle);
+          box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.015);
         }
 
         .yantra-prompt-chip {
-          background: var(--bg-base);
+          background: var(--bg-panel);
           border: 0.5px solid var(--border-subtle);
           border-radius: 999px;
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
           color: var(--text-secondary);
           font-size: 11px;
           padding: 6px 10px;
         }
 
         .yantra-prompt-chip:hover {
-          border-color: var(--accent-primary);
-          color: var(--accent-glow);
+          border-color: var(--border-strong);
+          color: var(--text-primary);
         }
 
         .yantra-ai-input {
-          background: var(--bg-base);
+          background: var(--bg-panel-alt);
           border: 0.5px solid var(--border-subtle);
           border-radius: 8px;
+          box-shadow: inset 0 1px 0 var(--chrome-highlight);
           color: var(--text-primary);
           outline: none;
         }
@@ -4355,18 +4453,23 @@ export default function EditorWorkspace({
         }
 
         .yantra-ai-input:focus {
-          border-color: var(--accent-primary);
+          border-color: var(--border-strong);
         }
 
         .yantra-ai-submit {
-          background: var(--accent-primary);
+          background: linear-gradient(135deg, #7280f4 0%, #6270dd 100%);
           border-radius: 999px;
+          box-shadow:
+            0 10px 24px rgba(58, 70, 180, 0.24),
+            inset 0 1px 0 rgba(255, 255, 255, 0.14);
           font-weight: 600;
         }
 
         .yantra-ai-submit:hover {
-          background: #4f46e5;
-          box-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
+          background: linear-gradient(135deg, #7a87f8 0%, #6875e3 100%);
+          box-shadow:
+            0 14px 28px rgba(58, 70, 180, 0.28),
+            inset 0 1px 0 rgba(255, 255, 255, 0.16);
         }
 
         .yantra-ai-submit:disabled {
@@ -4375,7 +4478,7 @@ export default function EditorWorkspace({
         }
 
         .yantra-status-bar {
-          background: #050509;
+          background: var(--bg-terminal);
           border-top: 0.5px solid var(--border-subtle);
           color: var(--text-muted);
           font-size: 10px;
@@ -4412,18 +4515,18 @@ export default function EditorWorkspace({
         }
 
         .yantra-shell .monaco-editor .current-line {
-          background: rgba(99, 102, 241, 0.06) !important;
+          background: var(--accent-soft) !important;
           border: 0 !important;
         }
 
         .yantra-shell .monaco-editor .current-line-margin {
-          background: rgba(99, 102, 241, 0.06) !important;
-          border-left: 1px solid var(--accent-primary) !important;
+          background: var(--accent-soft) !important;
+          border-left: 1px solid var(--border-accent) !important;
           box-sizing: border-box;
         }
 
         .yantra-shell .monaco-editor .selected-text {
-          background: rgba(99, 102, 241, 0.2) !important;
+          background: var(--accent-strong) !important;
         }
 
         .yantra-shell .monaco-editor .cursor {

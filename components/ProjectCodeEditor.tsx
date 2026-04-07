@@ -31,17 +31,17 @@ type ProjectCodeEditorProps = {
 const MonacoEditor = dynamic(() => import('@monaco-editor/react').then((module) => module.default), {
   ssr: false,
   loading: () => (
-    <div className="h-full bg-[#08080f] p-4">
-      <div className="h-full rounded-[1.5rem] border border-[#1e1e38] bg-[#0d0d18] p-4 shadow-[0_20px_48px_rgba(0,0,0,0.24)]">
+    <div className="h-full bg-[#04070d] p-4">
+      <div className="h-full rounded-[1.5rem] border border-[#192131] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent),#090d14] p-4 shadow-[0_24px_56px_rgba(0,0,0,0.32)]">
         <div className="mb-4 flex items-center justify-between">
-          <div className="h-3 w-28 rounded-full bg-[#1e1e38]" />
-          <div className="h-3 w-16 rounded-full bg-[#1e1e38]" />
+          <div className="h-3 w-28 rounded-full bg-[#192131]" />
+          <div className="h-3 w-16 rounded-full bg-[#192131]" />
         </div>
         <div className="space-y-3 font-mono text-[12px]">
           {Array.from({ length: 10 }).map((_, index) => (
             <div key={index} className="flex items-center gap-3">
-              <div className="h-3 w-5 rounded-full bg-[#1e1e38]" />
-              <div className="h-3 rounded-full bg-[#11112a]" style={{ width: `${42 + (index % 4) * 12}%` }} />
+              <div className="h-3 w-5 rounded-full bg-[#192131]" />
+              <div className="h-3 rounded-full bg-[#0f1520]" style={{ width: `${42 + (index % 4) * 12}%` }} />
             </div>
           ))}
         </div>
@@ -198,14 +198,14 @@ export default function ProjectCodeEditor({
 
   if (!file) {
     return (
-      <div className="flex h-full min-h-[28rem] items-center justify-center bg-[#08080f]">
-        <p className="text-sm text-[#6b7280]">Open a file to start editing.</p>
+      <div className="flex h-full min-h-[28rem] items-center justify-center bg-[#04070d]">
+        <p className="text-sm text-[#93a0b7]">Open a file to start editing.</p>
       </div>
     );
   }
 
   return (
-    <div className="yantra-editor-surface h-full min-h-[28rem] overflow-hidden bg-[#08080f]">
+    <div className="yantra-editor-surface h-full min-h-[28rem] overflow-hidden bg-[#04070d]">
       <MonacoEditor
         beforeMount={setupMonaco}
         defaultValue={file.content}

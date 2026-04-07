@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
+  Check,
   ChevronDown,
   ChevronRight,
   LoaderCircle,
@@ -22,8 +23,10 @@ import {
   Save,
   Share2,
   Sparkles,
+  TerminalSquare,
   X,
 } from 'lucide-react';
+import type { Monaco } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import ShareModal from '@/editor/components/ShareModal';
 import ProjectCodeEditor from '@/editor/components/ProjectCodeEditor';
@@ -41,7 +44,11 @@ import type {
   EditorProjectFile,
   EditorProjectFileInput,
   EditorProjectSummary,
+  EditorTemplateKey,
 } from '@/editor/types';
+import { HoverExplain } from '../legacy/components/AI/HoverExplain';
+import { InlineErrorFix } from '../legacy/components/AI/InlineErrorFix';
+import type { EditorFile as LegacyEditorFile, Language as LegacyLanguage } from '../legacy/types';
 
 type EditorWorkspaceProps = {
   authedUser: EditorAuthedUser;
@@ -82,6 +89,21 @@ type ProblemEntry = {
   fileName: string;
   lineNumber: number | null;
   message: string;
+};
+
+type CommandPaletteItem = {
+  id: string;
+  label: string;
+  description?: string;
+  keywords: string;
+  onSelect: () => void | Promise<void>;
+};
+
+type JsRunnerMessage = {
+  source: 'yantra-js-runner';
+  runId: string;
+  type: 'log' | 'error' | 'done';
+  payload?: string;
 };
 
 const PYTHON_AUTOSAVE_DELAY_MS = 2000;
@@ -142,6 +164,150 @@ function serializeFiles(files: WorkspaceFile[]) {
 
 function getEntryFile(files: WorkspaceFile[]) {
   return files.find((file) => file.isEntry) ?? files[0] ?? null;
+}
+
+function getDefaultRunOutputText(templateKey?: EditorTemplateKey | null, entryFile?: WorkspaceFile | null) {
+  if (templateKey === 'web-playground') {
+    return 'Run the web playground to refresh the live preview.';
+  }
+
+  if (templateKey === 'js-playground' || entryFile?.language === 'javascript' || entryFile?.language === 'typescript') {
+    return 'Run your JavaScript or TypeScript file to see console output here.';
+  }
+
+  if (templateKey === 'python-playground') {
+    return 'Run your Python file to see stdout, stderr, and tracebacks here.';
+  }
+
+  return 'Open a project and run it to see output here.';
+}
+
+function appendExecutionText(currentValue: string, nextValue: string) {
+  if (!nextValue) {
+    return currentValue;
+  }
+
+  return currentValue ? `${currentValue}\n${nextValue}` : nextValue;
+}
+
+function buildExecutionOutput(stdout: string, stderr: string, fallbackMessage: string) {
+  if (stdout && stderr) {
+    return `${stdout}\n${stderr}`;
+  }
+
+  return stdout || stderr || fallbackMessage;
+}
+
+function serializeForInlineScript(value: string) {
+  return JSON.stringify(value)
+    .replace(/<\//g, '<\\/')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+function buildJsRunnerDocument(entryCode: string, runId: string) {
+  const serializedRunId = serializeForInlineScript(runId);
+  const serializedEntryCode = serializeForInlineScript(entryCode);
+
+  return `<!doctype html>
+<html lang="en">
+  <body>
+    <script>
+      const runId = ${serializedRunId};
+      const postToParent = (type, payload = '') => {
+        window.parent.postMessage(
+          {
+            source: 'yantra-js-runner',
+            runId,
+            type,
+            payload,
+          },
+          '*',
+        );
+      };
+
+      const formatLogValue = (value) => {
+        if (typeof value === 'string') {
+          return value;
+        }
+
+        try {
+          return JSON.stringify(value);
+        } catch (error) {
+          return String(value);
+        }
+      };
+
+      const formatLogArgs = (args) => Array.from(args).map(formatLogValue).join(' ');
+      const originalLog = console.log.bind(console);
+      const originalError = console.error.bind(console);
+
+      console.log = (...args) => {
+        const message = formatLogArgs(args);
+        postToParent('log', message);
+        originalLog(...args);
+      };
+
+      console.error = (...args) => {
+        const message = formatLogArgs(args);
+        postToParent('error', message);
+        originalError(...args);
+      };
+
+      window.addEventListener('error', (event) => {
+        const locationSuffix =
+          event.lineno && event.colno ? ' (' + event.lineno + ':' + event.colno + ')' : event.lineno ? ' (' + event.lineno + ')' : '';
+        postToParent('error', String(event.message || 'JavaScript runtime error') + locationSuffix);
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        const message = reason instanceof Error ? reason.stack || reason.message : String(reason);
+        postToParent('error', message);
+      });
+
+      Promise.resolve()
+        .then(() => {
+          const entryCode = ${serializedEntryCode};
+          return new Function(entryCode)();
+        })
+        .catch((error) => {
+          postToParent('error', error instanceof Error ? error.stack || error.message : String(error));
+        })
+        .finally(() => {
+          postToParent('done');
+        });
+    <\/script>
+  </body>
+</html>`;
+}
+
+async function getExecutableJsSource(file: WorkspaceFile) {
+  if (file.language !== 'typescript') {
+    return {
+      code: file.content,
+      diagnostics: '',
+    };
+  }
+
+  const ts = await import('typescript');
+  const transpiled = ts.transpileModule(file.content, {
+    compilerOptions: {
+      module: ts.ModuleKind.None,
+      target: ts.ScriptTarget.ES2020,
+    },
+    reportDiagnostics: true,
+  });
+
+  const diagnostics = (transpiled.diagnostics ?? [])
+    .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
+    .filter((message) => message.trim().length > 0)
+    .join('\n');
+
+  return {
+    code: transpiled.outputText,
+    diagnostics,
+  };
 }
 
 function buildWebPreviewDocument(files: WorkspaceFile[]) {
@@ -207,6 +373,15 @@ function getFileIndicator(path: string) {
     default:
       return { label: '•', color: '#9E9E9E' };
   }
+}
+
+function toLegacyEditorFile(file: WorkspaceFile): LegacyEditorFile {
+  return {
+    id: file.path,
+    name: getFileName(file.path),
+    language: file.language as LegacyLanguage,
+    content: file.content,
+  };
 }
 
 function buildTerminalLines(output: PythonRunOutput): TerminalLine[] {
@@ -287,9 +462,10 @@ function buildEditorTerminalLines(output: PythonRunOutput): TerminalLine[] {
   }
 
   const fallbackMessage =
-    output.status === 'running'
-      ? 'Executing your Python file in-browser...'
-      : output.output || 'Run your Python file to see stdout, stderr, and tracebacks here.';
+    output.output ||
+    (output.status === 'running'
+      ? 'Executing your file in-browser...'
+      : 'Run your file to see stdout, stderr, and tracebacks here.');
 
   return fallbackMessage.split(/\r?\n/).map((line, index) => ({
     id: `info-${index}`,
@@ -332,11 +508,7 @@ export default function EditorWorkspace({
   const router = useRouter();
   const initialFiles = initialProjectDetails ? toWorkspaceFiles(initialProjectDetails.files) : [];
   const initialEntryFile = initialProjectDetails ? getEntryFile(initialFiles) : null;
-  const initialOutputText = initialProjectDetails
-    ? initialProjectDetails.project.templateKey === 'web-playground'
-      ? 'Run the web playground to refresh the live preview.'
-      : 'Run your Python file to see stdout, stderr, and tracebacks here.'
-    : 'Open a project and run it to see Python output here.';
+  const initialOutputText = getDefaultRunOutputText(initialProjectDetails?.project.templateKey ?? null, initialEntryFile);
 
   const [workspaceStatus, setWorkspaceStatus] = useState<WorkspaceStatus>(initialProjectDetails ? 'ready' : 'loading');
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
@@ -360,12 +532,22 @@ export default function EditorWorkspace({
   const [assistResponse, setAssistResponse] = useState('');
   const [assistError, setAssistError] = useState<string | null>(null);
   const [assistLoading, setAssistLoading] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [commandPaletteQuery, setCommandPaletteQuery] = useState('');
+  const [commandPaletteHighlightIndex, setCommandPaletteHighlightIndex] = useState(0);
   const [pythonRunOutput, setPythonRunOutput] = useState<PythonRunOutput>({
     status: 'idle',
     stdout: '',
     stderr: '',
     output: initialOutputText,
   });
+  const [jsRunOutput, setJsRunOutput] = useState<PythonRunOutput>({
+    status: 'idle',
+    stdout: '',
+    stderr: '',
+    output: initialOutputText,
+  });
+  const [jsRunnerSrcDoc, setJsRunnerSrcDoc] = useState('');
   const [previewSrcDoc, setPreviewSrcDoc] = useState('');
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isExplorerOpen, setIsExplorerOpen] = useState(true);
@@ -375,9 +557,15 @@ export default function EditorWorkspace({
   const [pendingFileAction, setPendingFileAction] = useState<PendingFileAction>(null);
   const [fileActionPath, setFileActionPath] = useState('');
   const [fileActionError, setFileActionError] = useState<string | null>(null);
+  const [explorerInlineError, setExplorerInlineError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isSaveErrorBannerDismissed, setIsSaveErrorBannerDismissed] = useState(false);
+  const [stdin, setStdin] = useState('');
+  const [isStdinExpanded, setIsStdinExpanded] = useState(false);
   const [activeBottomPanelTab, setActiveBottomPanelTab] = useState<BottomPanelTab>('terminal');
+  const [mountedEditor, setMountedEditor] = useState<editor.IStandaloneCodeEditor | null>(null);
+  const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(DEFAULT_BOTTOM_PANEL_HEIGHT);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
 
@@ -386,6 +574,9 @@ export default function EditorWorkspace({
   const newFileInputRef = useRef<HTMLInputElement | null>(null);
   const fileActionInputRef = useRef<HTMLInputElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const commandPaletteInputRef = useRef<HTMLInputElement | null>(null);
+  const jsRunnerIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const jsRunnerRunIdRef = useRef<string | null>(null);
   const editorColumnRef = useRef<HTMLDivElement | null>(null);
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const bottomPanelHeightRef = useRef(DEFAULT_BOTTOM_PANEL_HEIGHT);
@@ -395,6 +586,10 @@ export default function EditorWorkspace({
   const activeFile = useMemo(
     () => files.find((file) => file.path === activeFilePath) ?? null,
     [activeFilePath, files],
+  );
+  const activeOverlayFile = useMemo<LegacyEditorFile | null>(
+    () => (activeFile ? toLegacyEditorFile(activeFile) : null),
+    [activeFile],
   );
   const entryFile = useMemo(() => getEntryFile(files), [files]);
   const openTabs = useMemo(() => {
@@ -412,7 +607,13 @@ export default function EditorWorkspace({
   }, [files, openFilePaths]);
   const isPythonProject = project?.templateKey === 'python-playground';
   const isWebProject = project?.templateKey === 'web-playground';
+  const isJsProject =
+    !isPythonProject &&
+    !isWebProject &&
+    (entryFile?.language === 'javascript' || entryFile?.language === 'typescript');
+  const activeRunOutput = isJsProject ? jsRunOutput : pythonRunOutput;
   const isTitleDirty = projectTitle.trim() !== savedProjectTitle.trim();
+  const stdinCharacterCountLabel = `${stdin.length} char${stdin.length === 1 ? '' : 's'}`;
   const filesSnapshot = useMemo(() => serializeFiles(files), [files]);
   const savedFiles = useMemo(() => JSON.parse(savedFilesSnapshot) as WorkspaceFile[], [savedFilesSnapshot]);
   const areFilesDirty = filesSnapshot !== savedFilesSnapshot;
@@ -429,30 +630,31 @@ export default function EditorWorkspace({
           : isDirty
             ? 'Unsaved changes'
             : 'Synced';
+  const showSaveErrorBanner = saveStatus === 'error' && Boolean(workspaceError) && !isSaveErrorBannerDismissed;
   const panelIsCollapsed = bottomPanelHeight === 0;
   const activeFileName = activeFile ? getFileName(activeFile.path) : 'No file selected';
   const activeFileIndicator = activeFile ? getEditorFileIndicator(activeFile.path) : null;
-  const projectKindLabel = isWebProject ? 'WEB PLAYGROUND' : 'PYTHON PLAYGROUND';
-  const isRunning = pythonRunOutput.status === 'running';
+  const projectKindLabel = isWebProject ? 'WEB PLAYGROUND' : isJsProject ? 'JS PLAYGROUND' : 'PYTHON PLAYGROUND';
+  const isRunning = activeRunOutput.status === 'running';
   const runButtonLabel = isRunning ? 'RUNNING...' : 'RUN';
   const panelStatusLabel = isWebProject
     ? previewSrcDoc
       ? 'Preview live'
       : 'Preview idle'
-    : pythonRunOutput.status === 'running'
+    : activeRunOutput.status === 'running'
       ? 'Process running'
-      : pythonRunOutput.status === 'error'
+      : activeRunOutput.status === 'error'
         ? 'Run failed'
-        : pythonRunOutput.status === 'success'
+        : activeRunOutput.status === 'success'
           ? 'Last run finished'
           : 'Ready';
   const panelStatusDotColor = isWebProject
     ? previewSrcDoc
       ? '#4ade80'
       : '#374151'
-    : pythonRunOutput.status === 'running'
+    : activeRunOutput.status === 'running'
       ? '#818cf8'
-      : pythonRunOutput.status === 'error'
+      : activeRunOutput.status === 'error'
         ? '#f87171'
         : '#4ade80';
 
@@ -478,8 +680,8 @@ export default function EditorWorkspace({
         .map((file) => file.path),
     );
   }, [files, savedFiles]);
-  const terminalLines = useMemo(() => buildEditorTerminalLines(pythonRunOutput), [pythonRunOutput]);
-  const problemEntries = useMemo(() => buildProblemEntries(pythonRunOutput.stderr, entryFile), [entryFile, pythonRunOutput.stderr]);
+  const terminalLines = useMemo(() => buildEditorTerminalLines(activeRunOutput), [activeRunOutput]);
+  const problemEntries = useMemo(() => buildProblemEntries(activeRunOutput.stderr, entryFile), [activeRunOutput.stderr, entryFile]);
   const panelTabs = [
     { id: 'terminal' as BottomPanelTab, label: isWebProject ? 'preview' : 'terminal' },
     { id: 'problems' as BottomPanelTab, label: 'problems', count: problemEntries.length },
@@ -488,6 +690,11 @@ export default function EditorWorkspace({
 
   const handleEditorReady = useCallback((nextEditor: editor.IStandaloneCodeEditor | null) => {
     editorRef.current = nextEditor;
+    setMountedEditor(nextEditor);
+  }, []);
+
+  const handleMonacoReady = useCallback((nextMonacoInstance: Monaco | null) => {
+    setMonacoInstance(nextMonacoInstance);
   }, []);
 
   useEffect(() => {
@@ -570,6 +777,8 @@ export default function EditorWorkspace({
     setShareUrl('');
     setShareError(null);
     setPreviewSrcDoc('');
+    setJsRunnerSrcDoc('');
+    jsRunnerRunIdRef.current = null;
     setIsCreatingFile(false);
     setNewFilePath('');
     setNewFileError(null);
@@ -577,10 +786,13 @@ export default function EditorWorkspace({
       status: 'idle',
       stdout: '',
       stderr: '',
-      output:
-        projectDetails.project.templateKey === 'web-playground'
-          ? 'Run the web playground to refresh the live preview.'
-          : 'Run your Python file to see stdout, stderr, and tracebacks here.',
+      output: getDefaultRunOutputText(projectDetails.project.templateKey, nextActiveFile),
+    });
+    setJsRunOutput({
+      status: 'idle',
+      stdout: '',
+      stderr: '',
+      output: getDefaultRunOutputText(projectDetails.project.templateKey, nextActiveFile),
     });
     setWorkspaceStatus('ready');
   }, []);
@@ -700,6 +912,87 @@ export default function EditorWorkspace({
 
     void warmPyodideRuntime();
   }, [isPythonProject, project?.id]);
+
+  useEffect(() => {
+    const handleJsRunnerMessage = (event: MessageEvent<JsRunnerMessage>) => {
+      if (event.source !== jsRunnerIframeRef.current?.contentWindow) {
+        return;
+      }
+
+      const message = event.data;
+
+      if (!message || message.source !== 'yantra-js-runner' || message.runId !== jsRunnerRunIdRef.current) {
+        return;
+      }
+
+      if (message.type === 'log') {
+        setJsRunOutput((currentOutput) => {
+          const stdout = appendExecutionText(currentOutput.stdout, message.payload ?? '');
+
+          return {
+            ...currentOutput,
+            stdout,
+            output: buildExecutionOutput(stdout, currentOutput.stderr, 'JavaScript finished without output.'),
+          };
+        });
+        return;
+      }
+
+      if (message.type === 'error') {
+        setJsRunOutput((currentOutput) => {
+          const stderr = appendExecutionText(currentOutput.stderr, message.payload ?? '');
+
+          return {
+            ...currentOutput,
+            status: 'error',
+            stderr,
+            output: buildExecutionOutput(currentOutput.stdout, stderr, 'JavaScript finished with an error.'),
+          };
+        });
+        return;
+      }
+
+      if (message.type === 'done') {
+        setJsRunOutput((currentOutput) => ({
+          ...currentOutput,
+          status: currentOutput.stderr.trim().length > 0 ? 'error' : 'success',
+          output: buildExecutionOutput(currentOutput.stdout, currentOutput.stderr, 'JavaScript finished without output.'),
+        }));
+      }
+    };
+
+    window.addEventListener('message', handleJsRunnerMessage);
+
+    return () => {
+      window.removeEventListener('message', handleJsRunnerMessage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (stdin.length > 0) {
+      setIsStdinExpanded(true);
+    }
+  }, [stdin]);
+
+  useEffect(() => {
+    if (!explorerInlineError) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setExplorerInlineError(null);
+    }, 2800);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [explorerInlineError]);
+
+  useEffect(() => {
+    if (saveStatus === 'error') {
+      setIsSaveErrorBannerDismissed(false);
+    }
+  }, [saveStatus, workspaceError]);
 
   useEffect(() => {
     if (!project?.id || !areFilesDirty) {
@@ -856,15 +1149,32 @@ export default function EditorWorkspace({
   }
 
   function startRenameFile(path: string) {
+    setExplorerInlineError(null);
     setPendingFileAction({ type: 'rename', path });
     setFileActionPath(path);
     setFileActionError(null);
   }
 
   function startDeleteFile(path: string) {
-    setPendingFileAction({ type: 'delete', path });
-    setFileActionPath(path);
-    setFileActionError(null);
+    setExplorerInlineError(null);
+
+    if (files.length === 1) {
+      setPendingFileAction(null);
+      setFileActionPath('');
+      setFileActionError(null);
+      setExplorerInlineError('You need at least one file in the project.');
+      return;
+    }
+
+    if (dirtyFilePaths.has(path)) {
+      setPendingFileAction({ type: 'delete', path });
+      setFileActionPath(path);
+      setFileActionError(null);
+      return;
+    }
+
+    cancelFileAction();
+    void deleteFile(path);
   }
 
   function cancelFileAction() {
@@ -973,6 +1283,53 @@ export default function EditorWorkspace({
     }
   }
 
+  async function deleteFile(path: string) {
+    if (files.length === 1) {
+      setExplorerInlineError('You need at least one file in the project.');
+      return;
+    }
+
+    const fileIndex = files.findIndex((file) => file.path === path);
+
+    if (fileIndex < 0) {
+      return;
+    }
+
+    const nextFiles = files
+      .filter((file) => file.path !== path)
+      .map((file, index) => ({
+        ...file,
+        sortOrder: index,
+      }));
+
+    if (!nextFiles.some((file) => file.isEntry) && nextFiles[0]) {
+      nextFiles[0] = { ...nextFiles[0], isEntry: true };
+    }
+
+    const nextPreferredActivePath =
+      files[fileIndex + 1]?.path ?? files[fileIndex - 1]?.path ?? nextFiles[0]?.path ?? null;
+    const nextActivePath = nextFiles.some((file) => file.path === nextPreferredActivePath)
+      ? nextPreferredActivePath
+      : nextFiles[0]?.path ?? null;
+
+    const deletedOpenTabIndex = openFilePaths.indexOf(path);
+    const nextOpenFilePaths = openFilePaths.filter((currentPath) => currentPath !== path);
+
+    if (activeFilePath === path && nextActivePath && !nextOpenFilePaths.includes(nextActivePath)) {
+      const insertionIndex = deletedOpenTabIndex >= 0 ? Math.min(deletedOpenTabIndex, nextOpenFilePaths.length) : nextOpenFilePaths.length;
+      nextOpenFilePaths.splice(insertionIndex, 0, nextActivePath);
+    }
+
+    setFiles(nextFiles);
+    setOpenFilePaths(nextOpenFilePaths);
+
+    if (activeFilePath === path) {
+      setActiveFilePath(nextActivePath);
+    }
+
+    await persistFileSet(nextFiles);
+  }
+
   async function confirmNewFileCreation() {
     const validation = validateNewFilePath(newFilePath);
 
@@ -982,7 +1339,7 @@ export default function EditorWorkspace({
         return;
       }
 
-      setNewFileError(validation.error);
+      setNewFileError(validation.error ?? 'Unable to create the file.');
       window.requestAnimationFrame(() => {
         newFileInputRef.current?.focus();
         newFileInputRef.current?.select();
@@ -1019,6 +1376,8 @@ export default function EditorWorkspace({
     }
 
     if (isPythonProject) {
+      jsRunnerRunIdRef.current = null;
+      setJsRunnerSrcDoc('');
       setPythonRunOutput({
         status: 'running',
         stdout: '',
@@ -1027,7 +1386,7 @@ export default function EditorWorkspace({
       });
       setActiveBottomPanelTab('terminal');
 
-      const result = await runPythonInBrowser(entryFile.content);
+      const result = await runPythonInBrowser(entryFile.content, stdin);
 
       setPythonRunOutput({
         status: result.status,
@@ -1038,7 +1397,62 @@ export default function EditorWorkspace({
       return;
     }
 
+    if (isJsProject) {
+      const nextRunId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `js-run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      let executableSource = entryFile.content;
+
+      jsRunnerRunIdRef.current = null;
+      setJsRunnerSrcDoc('');
+      setPreviewSrcDoc('');
+
+      if (entryFile.language === 'typescript') {
+        try {
+          const transpiled = await getExecutableJsSource(entryFile);
+
+          if (transpiled.diagnostics) {
+            setJsRunOutput({
+              status: 'error',
+              stdout: '',
+              stderr: transpiled.diagnostics,
+              output: transpiled.diagnostics,
+            });
+            setActiveBottomPanelTab('terminal');
+            return;
+          }
+
+          executableSource = transpiled.code;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unable to transpile this TypeScript file.';
+
+          setJsRunOutput({
+            status: 'error',
+            stdout: '',
+            stderr: message,
+            output: message,
+          });
+          setActiveBottomPanelTab('terminal');
+          return;
+        }
+      }
+
+      jsRunnerRunIdRef.current = nextRunId;
+      setJsRunOutput({
+        status: 'running',
+        stdout: '',
+        stderr: '',
+        output: 'Running your JavaScript or TypeScript file in-browser...',
+      });
+      setActiveBottomPanelTab('terminal');
+      setJsRunnerSrcDoc(buildJsRunnerDocument(executableSource, nextRunId));
+      return;
+    }
+
     if (isWebProject) {
+      jsRunnerRunIdRef.current = null;
+      setJsRunnerSrcDoc('');
       setPreviewSrcDoc(buildWebPreviewDocument(files));
       setActiveBottomPanelTab('terminal');
     }
@@ -1048,23 +1462,55 @@ export default function EditorWorkspace({
     await saveProject({ includeTitle: true });
   }, [project, projectTitle, files, isTitleDirty, areFilesDirty, devBypass]);
 
+  function openCommandPalette() {
+    setCommandPaletteOpen(true);
+    setCommandPaletteQuery('');
+    setCommandPaletteHighlightIndex(0);
+  }
+
+  function closeCommandPalette() {
+    setCommandPaletteOpen(false);
+    setCommandPaletteQuery('');
+    setCommandPaletteHighlightIndex(0);
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const isModifierPressed = event.metaKey || event.ctrlKey;
+      const isTitleRevertShortcut =
+        isModifierPressed && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'z';
+      const eventTarget = event.target;
+      const isEditableTarget =
+        eventTarget instanceof HTMLElement &&
+        (eventTarget.isContentEditable ||
+          eventTarget.tagName === 'INPUT' ||
+          eventTarget.tagName === 'TEXTAREA' ||
+          eventTarget.tagName === 'SELECT');
+
+      if (isModifierPressed && event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        openCommandPalette();
+        return;
+      }
+
+      if (commandPaletteOpen) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeCommandPalette();
+        }
+
+        return;
+      }
+
+      if (isTitleRevertShortcut && !isEditingTitle && isTitleDirty && !isEditableTarget) {
+        event.preventDefault();
+        revertProjectTitleToSaved();
+        return;
+      }
 
       if (isModifierPressed && event.key.toLowerCase() === 's') {
         event.preventDefault();
         void handleManualSave();
-        return;
-      }
-
-      if (isModifierPressed && event.key.toLowerCase() === 'p') {
-        event.preventDefault();
-        setIsSidebarVisible(true);
-        window.requestAnimationFrame(() => {
-          searchInputRef.current?.focus();
-          searchInputRef.current?.select();
-        });
         return;
       }
 
@@ -1078,7 +1524,18 @@ export default function EditorWorkspace({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleManualSave]);
+  }, [commandPaletteOpen, handleManualSave, isEditingTitle, isTitleDirty, savedProjectTitle]);
+
+  useEffect(() => {
+    if (!commandPaletteOpen) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      commandPaletteInputRef.current?.focus();
+      commandPaletteInputRef.current?.select();
+    });
+  }, [commandPaletteOpen]);
 
   async function confirmFileAction() {
     if (!pendingFileAction) {
@@ -1094,29 +1551,13 @@ export default function EditorWorkspace({
 
     if (pendingFileAction.type === 'delete') {
       if (files.length === 1) {
-        setFileActionError('You need at least one file in the project.');
+        cancelFileAction();
+        setExplorerInlineError('You need at least one file in the project.');
         return;
       }
 
-      const nextFiles = files
-        .filter((file) => file.path !== pendingFileAction.path)
-        .map((file, index) => ({
-          ...file,
-          isEntry: file.path === pendingFileAction.path ? false : file.isEntry,
-          sortOrder: index,
-        }));
-
-      if (!nextFiles.some((file) => file.isEntry) && nextFiles[0]) {
-        nextFiles[0] = { ...nextFiles[0], isEntry: true };
-      }
-
-      setFiles(nextFiles);
-      setOpenFilePaths((currentPaths) => currentPaths.filter((path) => path !== pendingFileAction.path));
-      if (activeFilePath === pendingFileAction.path) {
-        setActiveFilePath(nextFiles[0]?.path ?? null);
-      }
       cancelFileAction();
-      await persistFileSet(nextFiles);
+      await deleteFile(pendingFileAction.path);
       return;
     }
 
@@ -1266,6 +1707,38 @@ export default function EditorWorkspace({
     );
   }
 
+  const handleApplyFix = useCallback(
+    (lineNumber: number, replacementLine: string) => {
+      if (!activeFile) {
+        return;
+      }
+
+      setFiles((currentFiles) =>
+        currentFiles.map((file) => {
+          if (file.path !== activeFile.path) {
+            return file;
+          }
+
+          const lines = file.content.split('\n');
+
+          if (lineNumber < 1 || lineNumber > lines.length) {
+            return file;
+          }
+
+          lines[lineNumber - 1] = replacementLine;
+
+          return {
+            ...file,
+            content: lines.join('\n'),
+          };
+        }),
+      );
+
+      editorRef.current?.focus();
+    },
+    [activeFile],
+  );
+
   function handleFileSelect(path: string) {
     setActiveFilePath(path);
     setOpenFilePaths((currentPaths) => (currentPaths.includes(path) ? currentPaths : [...currentPaths, path]));
@@ -1281,6 +1754,11 @@ export default function EditorWorkspace({
 
       return nextPaths;
     });
+  }
+
+  function revertProjectTitleToSaved() {
+    setProjectTitle(savedProjectTitle);
+    setIsEditingTitle(false);
   }
 
   function commitTitleEdit() {
@@ -1368,6 +1846,107 @@ export default function EditorWorkspace({
     });
   }
 
+  function executeCommandPaletteItem(item: CommandPaletteItem | undefined) {
+    if (!item) {
+      return;
+    }
+
+    closeCommandPalette();
+    void item.onSelect();
+  }
+
+  const commandPaletteItems: CommandPaletteItem[] = [
+    {
+      id: 'run',
+      label: 'Run',
+      description: isWebProject
+        ? 'Refresh the live preview for this project.'
+        : isJsProject
+          ? 'Execute the current JavaScript or TypeScript entry file.'
+          : 'Execute the current project.',
+      keywords: `run execute ${isWebProject ? 'preview web' : isJsProject ? 'javascript js typescript ts console terminal' : 'python terminal'}`,
+      onSelect: () => handleRun(),
+    },
+    {
+      id: 'save',
+      label: 'Save',
+      description: 'Persist the current project changes.',
+      keywords: 'save sync persist project',
+      onSelect: () => handleManualSave(),
+    },
+    {
+      id: 'share',
+      label: 'Share',
+      description: 'Open the share dialog for this project.',
+      keywords: 'share publish link',
+      onSelect: () => handleShare(),
+    },
+    {
+      id: 'new-file',
+      label: 'New File',
+      description: 'Create a new file in the project.',
+      keywords: 'new file create add',
+      onSelect: () => startNewFileCreation(),
+    },
+    {
+      id: 'toggle-explorer',
+      label: 'Toggle Explorer',
+      description: isSidebarVisible ? 'Hide the explorer sidebar.' : 'Show the explorer sidebar.',
+      keywords: 'toggle explorer sidebar files',
+      onSelect: () => setIsSidebarVisible((current) => !current),
+    },
+    {
+      id: 'toggle-ai-assist',
+      label: 'Toggle AI Assist',
+      description: assistOpen ? 'Close the AI assist panel.' : 'Open the AI assist panel.',
+      keywords: 'toggle ai assist copilot chat',
+      onSelect: () => setAssistOpen((current) => !current),
+    },
+    ...files.map((file) => ({
+      id: `open-file-${file.path}`,
+      label: `Open file: ${getFileName(file.path)}`,
+      description: file.path,
+      keywords: `open file ${file.path.toLowerCase()} ${getFileName(file.path).toLowerCase()}`,
+      onSelect: () => handleFileSelect(file.path),
+    })),
+    {
+      id: 'switch-terminal',
+      label: 'Switch to terminal',
+      description: isWebProject ? 'Open the preview panel.' : 'Open the terminal panel.',
+      keywords: `switch terminal ${isWebProject ? 'preview' : isJsProject ? 'javascript typescript output logs' : 'output run'}`,
+      onSelect: () => handlePanelTabSelect('terminal'),
+    },
+    {
+      id: 'switch-problems',
+      label: 'Switch to problems',
+      description: 'Open the problems panel.',
+      keywords: 'switch problems errors diagnostics',
+      onSelect: () => handlePanelTabSelect('problems'),
+    },
+  ];
+
+  const normalizedCommandPaletteQuery = commandPaletteQuery.trim().toLowerCase();
+  const filteredCommandPaletteItems = normalizedCommandPaletteQuery
+    ? commandPaletteItems.filter((item) => {
+        const searchableText = `${item.label} ${item.description ?? ''} ${item.keywords}`.toLowerCase();
+        return searchableText.includes(normalizedCommandPaletteQuery);
+      })
+    : commandPaletteItems;
+
+  useEffect(() => {
+    if (!commandPaletteOpen) {
+      return;
+    }
+
+    setCommandPaletteHighlightIndex((currentIndex) => {
+      if (filteredCommandPaletteItems.length === 0) {
+        return 0;
+      }
+
+      return Math.min(currentIndex, filteredCommandPaletteItems.length - 1);
+    });
+  }, [commandPaletteOpen, filteredCommandPaletteItems.length]);
+
   if (workspaceStatus === 'loading') {
     return (
       <main
@@ -1432,15 +2011,25 @@ export default function EditorWorkspace({
                 onChange={(event) => setProjectTitle(event.target.value)}
                 onBlur={commitTitleEdit}
                 onKeyDown={(event) => {
+                  const isTitleRevertShortcut =
+                    (event.metaKey || event.ctrlKey) &&
+                    !event.shiftKey &&
+                    !event.altKey &&
+                    event.key.toLowerCase() === 'z';
+
                   if (event.key === 'Enter') {
                     event.preventDefault();
                     commitTitleEdit();
                   }
 
+                  if (isTitleRevertShortcut) {
+                    event.preventDefault();
+                    revertProjectTitleToSaved();
+                  }
+
                   if (event.key === 'Escape') {
                     event.preventDefault();
-                    setProjectTitle(savedProjectTitle);
-                    setIsEditingTitle(false);
+                    revertProjectTitleToSaved();
                   }
                 }}
                 className="yantra-title-input h-8 min-w-[10rem] max-w-[18rem] px-3"
@@ -1521,7 +2110,28 @@ export default function EditorWorkspace({
 
         <div className="flex shrink-0 items-center gap-2 border-l border-[color:var(--border-subtle)] px-3">
           <div className="hidden items-center gap-2 text-[10px] xl:flex">
-            <span className="yantra-status-text">{saveStatusLabel}</span>
+            <span
+              className={`yantra-status-text inline-flex items-center gap-1.5 ${
+                saveStatus === 'error'
+                  ? 'text-[var(--red)]'
+                  : saveStatus === 'saving'
+                    ? 'text-[var(--accent-glow)]'
+                    : isDirty
+                      ? 'text-[var(--yellow)]'
+                      : 'text-[var(--green)]'
+              }`}
+            >
+              {saveStatus === 'error' ? (
+                <AlertCircle className="h-3.5 w-3.5" />
+              ) : saveStatus === 'saving' ? (
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              ) : isDirty ? (
+                <span className="inline-flex h-[6px] w-[6px] rounded-full bg-[var(--yellow)] animate-pulse" />
+              ) : (
+                <Check className="h-3.5 w-3.5" />
+              )}
+              {saveStatusLabel}
+            </span>
             <span className="yantra-divider">|</span>
             <span className="yantra-status-text inline-flex items-center gap-1.5">
               <span className="inline-flex h-[5px] w-[5px] rounded-full" style={{ backgroundColor: panelStatusDotColor }} />
@@ -1586,6 +2196,36 @@ export default function EditorWorkspace({
           </button>
         </div>
       </header>
+
+      {showSaveErrorBanner ? (
+        <div className="yantra-save-banner flex items-center justify-between gap-3 px-4 py-3" role="alert">
+          <div className="flex min-w-0 items-center gap-2 text-[12px]">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span className="truncate">{workspaceError}</span>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              className="yantra-save-banner-button inline-flex h-8 items-center px-3 text-[11px] font-semibold uppercase tracking-[0.08em]"
+              onClick={() => {
+                void handleManualSave();
+              }}
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              className="yantra-icon-button inline-flex h-8 w-8 items-center justify-center"
+              onClick={() => setIsSaveErrorBannerDismissed(true)}
+              aria-label="Dismiss save error"
+              title="Dismiss save error"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
         <nav className="yantra-rail flex w-9 shrink-0 flex-col items-center justify-between py-2">
@@ -1720,6 +2360,12 @@ export default function EditorWorkspace({
                     </div>
                   </div>
 
+                  {explorerInlineError ? (
+                    <div className="mx-3 mb-2 rounded-md border border-[rgba(248,113,113,0.35)] bg-[rgba(127,29,29,0.24)] px-3 py-2 text-[11px] leading-5 text-[var(--red)]">
+                      {explorerInlineError}
+                    </div>
+                  ) : null}
+
                   {filteredFiles.map((file) => {
                     const indicator = getEditorFileIndicator(file.path);
                     const isActive = activeFile?.path === file.path;
@@ -1728,7 +2374,7 @@ export default function EditorWorkspace({
                     return (
                       <div
                         key={file.path}
-                        className={`yantra-file-item flex w-full items-center gap-2 text-left ${isActive ? 'is-active' : ''}`}
+                        className={`yantra-file-item group flex w-full items-center gap-2 text-left ${isActive ? 'is-active' : ''}`}
                       >
                         <button
                           type="button"
@@ -1755,12 +2401,15 @@ export default function EditorWorkspace({
                           </button>
                           <button
                             type="button"
-                            className="yantra-icon-button inline-flex h-6 w-6 items-center justify-center text-[10px]"
-                            onClick={() => startDeleteFile(file.path)}
+                            className="yantra-icon-button inline-flex h-6 w-6 items-center justify-center opacity-0 pointer-events-none transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              startDeleteFile(file.path);
+                            }}
                             title="Delete file"
                             aria-label={`Delete ${getFileName(file.path)}`}
                           >
-                            D
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
@@ -1922,13 +2571,29 @@ export default function EditorWorkspace({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1">
+            <div className="relative min-h-0 flex-1">
               <ProjectCodeEditor
                 file={activeFile}
                 theme="dark"
                 errorText={runErrorText}
                 onChange={handleFileChange}
                 onEditorReady={handleEditorReady}
+                onMonacoReady={handleMonacoReady}
+              />
+              <HoverExplain
+                editor={editorRef.current ?? mountedEditor}
+                monaco={monacoInstance}
+                file={activeOverlayFile}
+                stderr={pythonRunOutput.stderr}
+                theme="dark"
+              />
+              <InlineErrorFix
+                editor={editorRef.current ?? mountedEditor}
+                monaco={monacoInstance}
+                file={activeOverlayFile}
+                stderr={pythonRunOutput.stderr}
+                theme="dark"
+                onApplyFix={handleApplyFix}
               />
             </div>
 
@@ -2006,27 +2671,65 @@ export default function EditorWorkspace({
                           )}
                         </div>
                       ) : (
-                        <div className="yantra-terminal h-full overflow-auto px-4 py-3">
-                          {terminalLines.map((line, index) => {
-                            const isLastLine = index === terminalLines.length - 1;
-
-                            return (
-                              <div
-                                key={line.id}
-                                className={`${
-                                  line.tone === 'stderr'
-                                    ? 'yantra-terminal-line--stderr'
-                                    : line.tone === 'stdout'
-                                      ? 'yantra-terminal-line--stdout'
-                                      : 'yantra-terminal-line--info'
-                                }`}
+                        <div className="flex h-full min-h-0 flex-col bg-[#060609]">
+                          <div className="shrink-0 border-b border-[color:var(--border-subtle)] px-4 py-3">
+                            <section className="overflow-hidden rounded-md border border-[color:var(--border-subtle)] bg-[rgba(15,23,42,0.28)]">
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                                onClick={() => setIsStdinExpanded((current) => !current)}
                               >
-                                <span className="yantra-terminal-prefix select-none">{line.prefix}</span>
-                                <span>{line.text}</span>
-                                {isLastLine ? <span className="yantra-editor-cursor">|</span> : null}
-                              </div>
-                            );
-                          })}
+                                <span className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                                  <TerminalSquare className="h-4 w-4 text-[var(--accent-primary)]" />
+                                  stdin
+                                </span>
+                                <span className="inline-flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
+                                  {stdin.length > 0 ? stdinCharacterCountLabel : 'Optional input'}
+                                  {isStdinExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                </span>
+                              </button>
+
+                              {isStdinExpanded ? (
+                                <div className="border-t border-[color:var(--border-subtle)] px-4 pb-4 pt-3">
+                                  <textarea
+                                    value={stdin}
+                                    onChange={(event) => setStdin(event.target.value)}
+                                    rows={3}
+                                    placeholder="Optional stdin..."
+                                    className="w-full resize-none rounded-md border border-[color:var(--border-subtle)] bg-[#0b1020] px-3 py-3 font-mono text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)]"
+                                  />
+                                  {stdin.length > 0 ? (
+                                    <div className="mt-2 text-[11px] text-[var(--text-muted)]">
+                                      {stdinCharacterCountLabel} will be sent to stdin on the next Python run.
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </section>
+                          </div>
+
+                          <div className="yantra-terminal min-h-0 flex-1 overflow-auto px-4 py-3">
+                            {terminalLines.map((line, index) => {
+                              const isLastLine = index === terminalLines.length - 1;
+
+                              return (
+                                <div
+                                  key={line.id}
+                                  className={`${
+                                    line.tone === 'stderr'
+                                      ? 'yantra-terminal-line--stderr'
+                                      : line.tone === 'stdout'
+                                        ? 'yantra-terminal-line--stdout'
+                                        : 'yantra-terminal-line--info'
+                                  }`}
+                                >
+                                  <span className="yantra-terminal-prefix select-none">{line.prefix}</span>
+                                  <span>{line.text}</span>
+                                  {isLastLine ? <span className="yantra-editor-cursor">|</span> : null}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )
                     ) : (
@@ -2204,6 +2907,121 @@ export default function EditorWorkspace({
         onClose={() => setShareModalOpen(false)}
       />
 
+      <iframe
+        ref={jsRunnerIframeRef}
+        title="Yantra JavaScript runner"
+        sandbox="allow-scripts"
+        srcDoc={jsRunnerSrcDoc}
+        className="hidden"
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+
+      {commandPaletteOpen ? (
+        <div
+          className="yantra-command-palette-backdrop fixed inset-0 z-[80] flex items-start justify-center px-4 pt-[10vh]"
+          onMouseDown={closeCommandPalette}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
+            className="yantra-command-palette w-full max-w-2xl overflow-hidden rounded-[24px] border"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-[color:var(--border-subtle)] px-4 py-4">
+              <input
+                ref={commandPaletteInputRef}
+                value={commandPaletteQuery}
+                onChange={(event) => {
+                  setCommandPaletteQuery(event.target.value);
+                  setCommandPaletteHighlightIndex(0);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+
+                    if (filteredCommandPaletteItems.length === 0) {
+                      return;
+                    }
+
+                    setCommandPaletteHighlightIndex((currentIndex) =>
+                      currentIndex >= filteredCommandPaletteItems.length - 1 ? 0 : currentIndex + 1,
+                    );
+                    return;
+                  }
+
+                  if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+
+                    if (filteredCommandPaletteItems.length === 0) {
+                      return;
+                    }
+
+                    setCommandPaletteHighlightIndex((currentIndex) =>
+                      currentIndex <= 0 ? filteredCommandPaletteItems.length - 1 : currentIndex - 1,
+                    );
+                    return;
+                  }
+
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    executeCommandPaletteItem(filteredCommandPaletteItems[commandPaletteHighlightIndex]);
+                    return;
+                  }
+
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeCommandPalette();
+                  }
+                }}
+                className="yantra-command-palette-input w-full"
+                placeholder="Type a command or search files..."
+                aria-label="Search commands"
+              />
+            </div>
+
+            <div className="max-h-[24rem] overflow-y-auto py-2">
+              {filteredCommandPaletteItems.length > 0 ? (
+                filteredCommandPaletteItems.map((item, index) => {
+                  const isActive = index === commandPaletteHighlightIndex;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`yantra-command-item flex w-full items-start justify-between gap-4 px-4 py-3 text-left ${
+                        isActive ? 'is-active' : ''
+                      }`}
+                      onMouseEnter={() => setCommandPaletteHighlightIndex(index)}
+                      onClick={() => executeCommandPaletteItem(item)}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px] font-medium">{item.label}</div>
+                        {item.description ? (
+                          <div className="mt-1 truncate text-[11px] text-[var(--text-muted)]">{item.description}</div>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 text-[10px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                        {isActive ? 'Enter' : null}
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="px-4 py-6 text-center text-[12px] text-[var(--text-muted)]">
+                  No matching commands.
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-[color:var(--border-subtle)] px-4 py-2 text-[11px] text-[var(--text-muted)]">
+              Use Arrow keys to navigate, Enter to run, Escape to close.
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <style jsx global>{`
         @keyframes yantra-editor-cursor-blink {
           0%,
@@ -2258,6 +3076,40 @@ export default function EditorWorkspace({
         .yantra-shell input,
         .yantra-shell textarea {
           transition: all 0.15s ease;
+        }
+
+        .yantra-command-palette-backdrop {
+          background: rgba(3, 6, 23, 0.72);
+          backdrop-filter: blur(10px);
+        }
+
+        .yantra-command-palette {
+          background: linear-gradient(180deg, rgba(17, 17, 42, 0.98), rgba(13, 13, 24, 0.98));
+          border-color: var(--border-subtle);
+          box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52);
+        }
+
+        .yantra-command-palette-input {
+          background: var(--bg-base);
+          border: 0;
+          color: var(--text-primary);
+          font-size: 14px;
+          outline: none;
+          padding: 2px 0;
+        }
+
+        .yantra-command-palette-input::placeholder {
+          color: var(--text-muted);
+        }
+
+        .yantra-command-item {
+          color: var(--text-secondary);
+        }
+
+        .yantra-command-item:hover,
+        .yantra-command-item.is-active {
+          background: rgba(99, 102, 241, 0.08);
+          color: var(--text-primary);
         }
 
         .yantra-shell * {
@@ -2388,6 +3240,23 @@ export default function EditorWorkspace({
         .yantra-status-text,
         .yantra-divider {
           color: var(--text-muted);
+        }
+
+        .yantra-save-banner {
+          background: rgba(248, 113, 113, 0.08);
+          border-bottom: 0.5px solid rgba(248, 113, 113, 0.24);
+          color: var(--red);
+        }
+
+        .yantra-save-banner-button {
+          background: rgba(248, 113, 113, 0.14);
+          border: 0.5px solid rgba(248, 113, 113, 0.24);
+          border-radius: 999px;
+          color: var(--text-primary);
+        }
+
+        .yantra-save-banner-button:hover {
+          background: rgba(248, 113, 113, 0.2);
         }
 
         .yantra-local-badge {

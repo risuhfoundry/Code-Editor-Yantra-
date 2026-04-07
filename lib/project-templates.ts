@@ -12,6 +12,7 @@ type EditorTemplateDefinition = {
 };
 
 const PYTHON_HELLO_WORLD = `print("Hello, Yantra!")`;
+const JS_HELLO_WORLD = `console.log("Hello, Yantra JS Playground!");`;
 
 const WEB_INDEX = `<!doctype html>
 <html lang="en">
@@ -114,10 +115,23 @@ const TEMPLATE_DEFINITIONS: Record<EditorTemplateKey, EditorTemplateDefinition> 
       },
     ],
   },
+  'js-playground': {
+    title: 'JavaScript Playground',
+    primaryLanguage: 'javascript',
+    files: [
+      {
+        path: 'script.js',
+        language: 'javascript',
+        content: JS_HELLO_WORLD,
+        sortOrder: 0,
+        isEntry: true,
+      },
+    ],
+  },
 };
 
 export function isEditorTemplateKey(value: string): value is EditorTemplateKey {
-  return value === 'python-playground' || value === 'web-playground';
+  return value === 'python-playground' || value === 'web-playground' || value === 'js-playground';
 }
 
 export function getEditorProjectTemplate(templateKey: EditorTemplateKey): EditorTemplateDefinition {

@@ -20,6 +20,7 @@ type ProjectCodeEditorProps = {
   readOnly?: boolean;
   onChange: (value: string) => void;
   onEditorReady?: (editorInstance: editor.IStandaloneCodeEditor | null) => void;
+  onMonacoReady?: (monacoInstance: Monaco | null) => void;
 };
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react').then((module) => module.default), {
@@ -38,6 +39,7 @@ export default function ProjectCodeEditor({
   readOnly = false,
   onChange,
   onEditorReady,
+  onMonacoReady,
 }: ProjectCodeEditorProps) {
   const [editorInstance, setEditorInstance] = useState<editor.IStandaloneCodeEditor | null>(null);
   const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
@@ -75,7 +77,19 @@ export default function ProjectCodeEditor({
     return () => {
       onEditorReady(null);
     };
-  }, [editorInstance]);
+  }, [editorInstance, onEditorReady]);
+
+  useEffect(() => {
+    if (!onMonacoReady) {
+      return;
+    }
+
+    onMonacoReady(monacoInstance);
+
+    return () => {
+      onMonacoReady(null);
+    };
+  }, [monacoInstance, onMonacoReady]);
 
   useEffect(() => {
     if (!editorInstance || !monacoInstance) {

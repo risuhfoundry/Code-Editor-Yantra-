@@ -15,15 +15,12 @@ interface StreamAIResponseOptions {
 }
 
 const readEnvValue = (key: 'NEXT_PUBLIC_USE_MOCK_API' | 'VITE_USE_MOCK_API') => {
-  if (typeof process !== 'undefined') {
-    const processValue = process.env[key];
-
-    if (typeof processValue === 'string') {
-      return processValue;
-    }
+  if (typeof process === 'undefined') {
+    return undefined;
   }
 
-  return (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.[key];
+  const processValue = process.env[key];
+  return typeof processValue === 'string' ? processValue : undefined;
 };
 
 const readMockFlag = () => {

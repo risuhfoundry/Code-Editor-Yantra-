@@ -69,7 +69,7 @@ export default function ProjectsPageClient({ initialProjects }: ProjectsPageClie
             </div>
             <h1 className="mt-4 font-display text-[3rem] leading-[0.9] tracking-tight text-white">Your playgrounds</h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/58">
-              Jump back into a saved project or start a fresh Python or web playground.
+              Jump back into a saved project or start a fresh Python, JavaScript, or web playground.
             </p>
           </div>
 
@@ -94,7 +94,7 @@ export default function ProjectsPageClient({ initialProjects }: ProjectsPageClie
 
         {templatePickerOpen ? (
           <section className="mt-5 rounded-[2rem] border border-white/8 bg-white/[0.03] p-5 shadow-[0_20px_64px_rgba(0,0,0,0.28)] backdrop-blur-[24px]">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               <button
                 type="button"
                 className="rounded-[1.6rem] border border-white/8 bg-black/28 p-5 text-left transition hover:border-white/16 hover:bg-white/[0.05]"
@@ -108,6 +108,22 @@ export default function ProjectsPageClient({ initialProjects }: ProjectsPageClie
                 <p className="mt-2 text-sm leading-relaxed text-white/58">Single-file Python project using the in-browser Pyodide runtime.</p>
                 <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.22em] text-white/42">
                   {creatingTemplate === 'python-playground' ? 'Creating...' : 'main.py ready'}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="rounded-[1.6rem] border border-white/8 bg-black/28 p-5 text-left transition hover:border-white/16 hover:bg-white/[0.05]"
+                onClick={() => {
+                  void createProject('js-playground');
+                }}
+                disabled={creatingTemplate !== null}
+              >
+                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/42">Template</div>
+                <div className="mt-3 text-2xl font-semibold tracking-tight text-white">JavaScript Playground</div>
+                <p className="mt-2 text-sm leading-relaxed text-white/58">Single-file JavaScript starter with in-browser console capture on Run.</p>
+                <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.22em] text-white/42">
+                  {creatingTemplate === 'js-playground' ? 'Creating...' : 'script.js ready'}
                 </div>
               </button>
 

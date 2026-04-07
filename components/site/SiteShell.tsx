@@ -19,10 +19,10 @@ function SiteBackground() {
   return (
     <div className="pointer-events-none fixed inset-0 z-[-2] overflow-hidden bg-[#040404]">
       <div className="absolute inset-0 bg-[linear-gradient(180deg,#020202_0%,#030303_26%,#050505_100%)]" />
-      <div className="site-orb absolute left-[-14%] top-[-8%] h-[36rem] w-[36rem] rounded-full bg-white/[0.1] blur-[170px]" />
-      <div className="site-orb site-orb-delay absolute right-[-10%] top-[14%] h-[30rem] w-[30rem] rounded-full bg-[rgba(108,115,128,0.18)] blur-[170px]" />
-      <div className="site-breathe absolute bottom-[-24%] left-[18%] h-[40rem] w-[40rem] rounded-full bg-[#1a1d23]/70 blur-[190px]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(163,172,184,0.12),transparent_18%),radial-gradient(circle_at_50%_120%,rgba(100,106,116,0.16),transparent_28%)]" />
+      <div className="site-orb absolute left-[-14%] top-[-8%] h-[36rem] w-[36rem] rounded-full bg-[rgba(120,229,255,0.18)] blur-[170px]" />
+      <div className="site-orb site-orb-delay absolute right-[-10%] top-[14%] h-[30rem] w-[30rem] rounded-full bg-[rgba(147,134,255,0.18)] blur-[170px]" />
+      <div className="site-breathe absolute bottom-[-24%] left-[18%] h-[40rem] w-[40rem] rounded-full bg-[rgba(243,196,126,0.14)] blur-[190px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(120,229,255,0.1),transparent_22%),radial-gradient(circle_at_80%_20%,rgba(147,134,255,0.12),transparent_18%),radial-gradient(circle_at_40%_110%,rgba(243,196,126,0.14),transparent_26%)]" />
       <div
         className="absolute inset-0 opacity-[0.18]"
         style={{
@@ -63,7 +63,7 @@ export default function SiteShell({ children }: SiteShellProps) {
           <div className="site-panel rounded-[1.75rem] px-4 py-3 sm:px-5">
             <div className="flex items-center justify-between gap-4">
               <Link href="/" className="group flex min-w-0 items-center gap-3" onClick={() => setMobileOpen(false)}>
-                <div className="flex h-11 w-11 items-center justify-center rounded-[1.15rem] border border-white/12 bg-white/[0.05] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[1.15rem] border border-white/12 bg-[linear-gradient(135deg,rgba(120,229,255,0.18),rgba(147,134,255,0.16),rgba(243,196,126,0.12))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
                   <span className="font-display text-2xl font-semibold leading-none text-white">Y</span>
                 </div>
                 <div className="min-w-0">
@@ -84,7 +84,7 @@ export default function SiteShell({ children }: SiteShellProps) {
                       href={link.href}
                       className={`rounded-full px-4 py-2 font-mono text-[10px] uppercase tracking-[0.24em] transition-colors ${
                         active
-                          ? 'border border-white/12 bg-white/[0.09] text-white'
+                          ? 'border border-[#78e5ff]/20 bg-[linear-gradient(135deg,rgba(120,229,255,0.16),rgba(147,134,255,0.14))] text-white'
                           : 'border border-transparent text-white/56 hover:border-white/8 hover:bg-white/[0.04] hover:text-white'
                       }`}
                     >
@@ -139,7 +139,7 @@ export default function SiteShell({ children }: SiteShellProps) {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="block rounded-[1.6rem] border border-white/8 bg-white/[0.04] px-5 py-4 text-lg text-white/86"
+                    className="block rounded-[1.6rem] border border-white/8 bg-[linear-gradient(135deg,rgba(120,229,255,0.08),rgba(147,134,255,0.06),rgba(255,255,255,0.03))] px-5 py-4 text-lg text-white/86"
                     onClick={() => setMobileOpen(false)}
                   >
                     {link.label}

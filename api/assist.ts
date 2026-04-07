@@ -21,7 +21,6 @@ function buildAssistPrompt(body: EditorAssistRequest) {
     'Keep your answer under 200 words unless the learner explicitly asks for more detail.',
     learnerLevel ? `Learner level: ${learnerLevel}` : null,
     `Language: ${body.language}`,
-    `Question: ${body.question.trim()}`,
     selectedSnippet ? `Selected text:\n${selectedSnippet}` : 'Selected text: none',
     `Current file content:\n\`\`\`${body.language}\n${body.fileContent}\n\`\`\``,
     'Give practical guidance, point to the likely next step, and keep the tone encouraging.',
@@ -69,6 +68,14 @@ export async function POST(request: Request) {
               ...body,
               learnerLevel: body.learnerLevel ?? profileResult.profile.skillLevel,
             }),
+          },
+          ...((body.history ?? []).map((message) => ({
+            role: message.role,
+            content: message.content,
+          })) as Array<{ role: 'user' | 'assistant'; content: string }>),
+          {
+            role: 'user',
+            content: body.question.trim(),
           },
         ],
         student: {

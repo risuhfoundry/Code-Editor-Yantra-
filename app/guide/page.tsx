@@ -6,34 +6,51 @@ const GUIDE_STEPS: ReadonlyArray<{
   title: string;
   description: string;
   icon: LucideIcon;
+  tone: string;
 }> = [
   {
     title: 'Open the editor',
     description: 'Launch Yantra at `/editor` and drop into the live workspace instead of preparing a local toolchain first.',
     icon: FileCode2,
+    tone: 'site-icon-frame--cyan',
   },
   {
     title: 'Choose the draft mode',
     description: 'Start with Python for quick logic or the web template when HTML, CSS, and JavaScript need to move together.',
     icon: FolderTree,
+    tone: 'site-icon-frame--gold',
   },
   {
     title: 'Run and inspect',
     description: 'Edit files, click Run, and use the output or preview panel to tighten the loop while the context is still fresh.',
     icon: PlayCircle,
+    tone: 'site-icon-frame--emerald',
   },
   {
     title: 'Share or remix',
     description: 'Generate a public link when you want feedback, or remix a shared project into your own workspace in one step.',
     icon: Share2,
+    tone: 'site-icon-frame--violet',
   },
 ] as const;
 
 const NOTES = [
-  'Python projects run in-browser through Pyodide, so the first experiment does not depend on local runtime setup.',
-  'Web playgrounds give you HTML, CSS, and JavaScript starter files plus an instant iframe preview on Run.',
-  'Autosave keeps the workspace updated every two seconds, and public editor access no longer requires sign-in.',
-  'Shared project views remain available through their existing share routes, so remix flows stay lightweight.',
+  {
+    text: 'Python projects run in-browser through Pyodide, so the first experiment does not depend on local runtime setup.',
+    tone: 'border-[#78e5ff]/14 bg-[rgba(120,229,255,0.08)] text-[#c3efff]',
+  },
+  {
+    text: 'Web playgrounds give you HTML, CSS, and JavaScript starter files plus an instant iframe preview on Run.',
+    tone: 'border-[#f3c47e]/14 bg-[rgba(243,196,126,0.08)] text-[#f7deb7]',
+  },
+  {
+    text: 'Autosave keeps the workspace updated every two seconds, and public editor access no longer requires sign-in.',
+    tone: 'border-[#6df3c6]/14 bg-[rgba(109,243,198,0.08)] text-[#c9fff0]',
+  },
+  {
+    text: 'Shared project views remain available through their existing share routes, so remix flows stay lightweight.',
+    tone: 'border-[#9386ff]/14 bg-[rgba(147,134,255,0.08)] text-[#ded5ff]',
+  },
 ] as const;
 
 export default function GuidePage() {
@@ -46,7 +63,9 @@ export default function GuidePage() {
             Getting started / First session
           </div>
           <h1 className="mt-8 font-display text-[4rem] leading-[0.88] tracking-[-0.07em] text-white sm:text-[5.2rem] lg:text-[5.9rem]">
-            From blank screen to shareable draft in a few deliberate moves.
+            From blank screen to a{' '}
+            <span className="bg-[linear-gradient(135deg,#78e5ff,#9386ff,#f3c47e)] bg-clip-text text-transparent">shareable draft</span>{' '}
+            in a few deliberate moves.
           </h1>
           <p className="site-copy mt-6 max-w-3xl text-base leading-8 sm:text-lg">
             Yantra is intentionally simple to enter. Open the workspace, choose a project shape, run code, inspect the result, and share the exact session when you are ready for another pair of eyes.
@@ -60,7 +79,7 @@ export default function GuidePage() {
             return (
               <section key={step.title} className="site-panel site-glass-hover rounded-[2rem] p-6 sm:p-7">
                 <div className="flex items-center justify-between gap-4">
-                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-[1rem] border border-white/10 bg-white/[0.04] text-white/74">
+                  <div className={`site-icon-frame h-12 w-12 ${step.tone}`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/24">0{index + 1}</div>
@@ -78,7 +97,7 @@ export default function GuidePage() {
               <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/34">Quick first run</div>
               <div className="mt-5 overflow-hidden rounded-[1.85rem] border border-white/10 bg-[#080808]">
                 <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-                  <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.24em] text-white/58">
+                  <div className="rounded-full border border-[#78e5ff]/16 bg-[linear-gradient(135deg,rgba(120,229,255,0.12),rgba(120,229,255,0.04))] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.24em] text-[#c8f4ff]">
                     main.py
                   </div>
                   <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/34">first pass</div>
@@ -87,16 +106,16 @@ export default function GuidePage() {
                 <div className="space-y-2 px-5 py-6 font-mono text-[13px] leading-7 text-white/78">
                   <div>
                     <span className="mr-4 text-white/18">1</span>
-                    <span className="text-white/46">print</span>(<span className="text-white/64">&quot;Hello, Yantra!&quot;</span>)
+                    <span className="text-[#79f3cf]">print</span>(<span className="text-[#f3c47e]">&quot;Hello, Yantra!&quot;</span>)
                   </div>
                   <div>
                     <span className="mr-4 text-white/18">2</span>
-                    <span className="text-white/46">print</span>(<span className="text-white/64">&quot;The workspace is live.&quot;</span>)
+                    <span className="text-[#79f3cf]">print</span>(<span className="text-[#8be8ff]">&quot;The workspace is live.&quot;</span>)
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 rounded-[1.8rem] bg-[linear-gradient(180deg,#f4efe7,#d8d2c7)] p-5 text-[#090909] shadow-[0_28px_48px_rgba(0,0,0,0.32)]">
+              <div className="mt-4 rounded-[1.8rem] bg-[linear-gradient(145deg,#f8efe2_0%,#ece8ff_50%,#dcf7ff_100%)] p-5 text-[#090909] shadow-[0_28px_48px_rgba(0,0,0,0.32)]">
                 <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-black/46">Output</div>
                 <div className="mt-4 font-mono text-sm text-black/76">&gt; Hello, Yantra!</div>
                 <div className="mt-1 font-mono text-sm text-black/76">&gt; The workspace is live.</div>
@@ -107,8 +126,8 @@ export default function GuidePage() {
               <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/34">Helpful notes</div>
               <div className="mt-5 space-y-4">
                 {NOTES.map((note) => (
-                  <div key={note} className="rounded-[1.55rem] border border-white/8 bg-black/20 px-4 py-4 text-sm leading-7 text-white/64">
-                    {note}
+                  <div key={note.text} className={`rounded-[1.55rem] border px-4 py-4 text-sm leading-7 ${note.tone}`}>
+                    {note.text}
                   </div>
                 ))}
               </div>

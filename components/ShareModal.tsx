@@ -16,8 +16,10 @@ const FOCUSABLE_SELECTOR =
 
 export default function ShareModal({ open, isLoading, shareUrl, error, onClose }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const embedUrl = shareUrl ? shareUrl.replace('/editor/share/', '/embed/') : '';
 
   useEffect(() => {
     if (!open) {
@@ -72,6 +74,15 @@ export default function ShareModal({ open, isLoading, shareUrl, error, onClose }
     const timeoutId = window.setTimeout(() => setCopied(false), 2000);
     return () => window.clearTimeout(timeoutId);
   }, [copied]);
+
+  useEffect(() => {
+    if (!embedCopied) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setEmbedCopied(false), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [embedCopied]);
 
   if (!open) {
     return null;
@@ -158,6 +169,38 @@ export default function ShareModal({ open, isLoading, shareUrl, error, onClose }
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   {copied ? 'Copied' : 'Copy Link'}
                 </button>
+              </div>
+
+              <div className="pt-2">
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[#374151]">
+                  Read-only embed URL
+                </label>
+                <input
+                  readOnly
+                  value={embedUrl}
+                  onFocus={(event) => event.currentTarget.select()}
+                  className="mt-2 w-full rounded-xl border border-[rgba(30,30,56,0.95)] bg-[#08080f] px-4 py-3 text-sm text-[#e2e8f0] outline-none focus:border-[#6366f1]"
+                  aria-label="Embed URL"
+                />
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full border border-[rgba(99,102,241,0.3)] bg-[#11112a] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#19193f] disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={async () => {
+                      if (!embedUrl) {
+                        return;
+                      }
+
+                      await navigator.clipboard.writeText(embedUrl);
+                      setEmbedCopied(true);
+                    }}
+                    disabled={!embedUrl}
+                    aria-label={embedCopied ? 'Copied embed link' : 'Copy embed link'}
+                  >
+                    {embedCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {embedCopied ? 'Copied' : 'Copy Embed'}
+                  </button>
+                </div>
               </div>
             </div>
           )}

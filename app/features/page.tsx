@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import SiteShell from '@/components/site/SiteShell';
+import FeatureVisualGallery from '@/components/site/FeatureVisualGallery';
 
 const FEATURE_SECTIONS: ReadonlyArray<{
   title: string;
@@ -19,6 +20,8 @@ const FEATURE_SECTIONS: ReadonlyArray<{
   description: string;
   points: readonly string[];
   icon: LucideIcon;
+  tone: string;
+  pointTone: string;
 }> = [
   {
     title: 'Monaco Editor',
@@ -27,6 +30,8 @@ const FEATURE_SECTIONS: ReadonlyArray<{
       'Yantra uses Monaco so the first interaction already feels serious. Syntax highlighting, familiar shortcuts, and a real text model give the browser workspace weight immediately.',
     points: ['VS Code-quality editing surface', 'Language-aware highlighting and model switching', 'Designed for quick but capable browser workflows'],
     icon: FileCode2,
+    tone: 'site-icon-frame--cyan',
+    pointTone: 'border-[#78e5ff]/14 bg-[rgba(120,229,255,0.08)] text-[#c3efff]',
   },
   {
     title: 'Run in One Click',
@@ -35,6 +40,8 @@ const FEATURE_SECTIONS: ReadonlyArray<{
       'Python projects execute through Pyodide and browser projects render through a live iframe preview, keeping the entire feedback loop inside one window.',
     points: ['Pyodide-backed Python execution', 'Instant preview for HTML, CSS, and JavaScript', 'Output and errors stay visible beside the draft'],
     icon: PlayCircle,
+    tone: 'site-icon-frame--emerald',
+    pointTone: 'border-[#6df3c6]/14 bg-[rgba(109,243,198,0.08)] text-[#c9fff0]',
   },
   {
     title: 'AI Assist',
@@ -43,6 +50,8 @@ const FEATURE_SECTIONS: ReadonlyArray<{
       'The AI panel stays alongside the editor so explanation, debugging, and refactoring suggestions remain part of the active composition instead of becoming a separate workflow.',
     points: ['Inline help for the active file', 'Quick prompts for explain, debug, and refactor', 'Built to support multiple project formats'],
     icon: Bot,
+    tone: 'site-icon-frame--violet',
+    pointTone: 'border-[#9386ff]/14 bg-[rgba(147,134,255,0.08)] text-[#ded5ff]',
   },
   {
     title: 'Smart File System',
@@ -51,6 +60,8 @@ const FEATURE_SECTIONS: ReadonlyArray<{
       'Projects feel like projects, not loose buffers. Explorer, tabs, filenames, and format awareness make small experiments easier to navigate and easier to trust.',
     points: ['Explorer sidebar and tab model', 'File badges and path-aware language selection', 'Supports Python, web files, JSON, Markdown, and plain text'],
     icon: FolderTree,
+    tone: 'site-icon-frame--gold',
+    pointTone: 'border-[#f3c47e]/14 bg-[rgba(243,196,126,0.08)] text-[#f7deb7]',
   },
   {
     title: 'Share and Remix',
@@ -59,6 +70,8 @@ const FEATURE_SECTIONS: ReadonlyArray<{
       'A public link can represent the exact current state of a project, and the next person can remix it into their own workspace instead of starting from a screenshot or pasted excerpt.',
     points: ['Public project sharing', 'Read-only viewer experience', 'One-click remix into a local editor workspace'],
     icon: Share2,
+    tone: 'site-icon-frame--rose',
+    pointTone: 'border-[#f58db2]/14 bg-[rgba(245,141,178,0.08)] text-[#ffd6e5]',
   },
   {
     title: 'Autosave',
@@ -67,6 +80,8 @@ const FEATURE_SECTIONS: ReadonlyArray<{
       'Yantra keeps saving in the background so the experience feels calmer. The product protects momentum without asking the user to think about it.',
     points: ['Frequent autosave cadence', 'Local storage support', 'Designed to reduce accidental work loss'],
     icon: SaveAll,
+    tone: 'site-icon-frame--emerald',
+    pointTone: 'border-[#6df3c6]/14 bg-[rgba(109,243,198,0.08)] text-[#c9fff0]',
   },
 ] as const;
 
@@ -75,16 +90,19 @@ const PRINCIPLES = [
     title: 'One room',
     body: 'Editing, runtime, preview, AI notes, and sharing stay in the same atmosphere so context does not evaporate.',
     icon: Globe,
+    tone: 'site-icon-frame--cyan',
   },
   {
     title: 'One rhythm',
     body: 'The interface is built around draft, run, inspect, and refine rather than setup, export, and context switching.',
     icon: Sparkles,
+    tone: 'site-icon-frame--violet',
   },
   {
     title: 'One handoff',
     body: 'The live project can become the shareable artifact, which keeps demos and review loops startlingly short.',
     icon: ArrowRight,
+    tone: 'site-icon-frame--gold',
   },
 ] as const;
 
@@ -98,7 +116,9 @@ export default function FeaturesPage() {
             Feature breakdown / Obsidian system
           </div>
           <h1 className="mt-8 font-display text-[4rem] leading-[0.88] tracking-[-0.07em] text-white sm:text-[5.4rem] lg:text-[6.1rem]">
-            Every layer is there to keep the draft moving.
+            Every layer is there to keep the{' '}
+            <span className="bg-[linear-gradient(135deg,#78e5ff,#9386ff,#f3c47e)] bg-clip-text text-transparent">draft</span>{' '}
+            moving.
           </h1>
           <p className="site-copy mt-6 max-w-3xl text-base leading-8 sm:text-lg">
             Yantra is deliberately composed around a tight loop: edit, run, inspect, refine, share. These are the pieces that make that loop feel fast, premium, and unusually coherent for a browser-native tool.
@@ -114,7 +134,7 @@ export default function FeaturesPage() {
             return (
               <section key={feature.title} className={`site-panel site-glass-hover rounded-[2.15rem] p-6 sm:p-7 ${wideClass}`}>
                 <div className="flex items-center justify-between gap-4">
-                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-[1rem] border border-white/10 bg-white/[0.04] text-white/74">
+                  <div className={`site-icon-frame h-12 w-12 ${feature.tone}`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/24">0{index + 1}</div>
@@ -128,7 +148,7 @@ export default function FeaturesPage() {
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   {feature.points.map((point) => (
-                    <div key={point} className="rounded-[1.4rem] border border-white/8 bg-black/20 px-4 py-4 text-sm leading-7 text-white/68">
+                    <div key={point} className={`rounded-[1.4rem] border px-4 py-4 text-sm leading-7 ${feature.pointTone}`}>
                       {point}
                     </div>
                   ))}
@@ -137,6 +157,8 @@ export default function FeaturesPage() {
             );
           })}
         </div>
+
+        <FeatureVisualGallery />
 
         <section className="pt-24">
           <div className="site-panel-strong rounded-[2.3rem] p-6 sm:p-8 lg:p-10">
@@ -157,7 +179,7 @@ export default function FeaturesPage() {
 
                   return (
                     <div key={principle.title} className="rounded-[1.8rem] border border-white/10 bg-black/20 p-5">
-                      <div className="inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border border-white/10 bg-white/[0.04] text-white/72">
+                      <div className={`site-icon-frame h-11 w-11 ${principle.tone}`}>
                         <Icon className="h-[18px] w-[18px]" />
                       </div>
                       <h3 className="mt-5 font-display text-[1.9rem] leading-[0.96] tracking-[-0.04em] text-white">{principle.title}</h3>

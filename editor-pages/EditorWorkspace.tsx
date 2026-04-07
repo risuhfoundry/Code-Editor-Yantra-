@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
@@ -17,23 +18,39 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Diff,
+  Keyboard,
+  Languages,
   LoaderCircle,
+  Minus,
+  Pause,
   Play,
   Plus,
   Save,
+  Settings2,
   Share2,
   Sparkles,
   TerminalSquare,
+  WrapText,
   X,
 } from 'lucide-react';
 import type { Monaco } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import ShareModal from '@/editor/components/ShareModal';
 import ProjectCodeEditor from '@/editor/components/ProjectCodeEditor';
+import ProjectCodeDiffEditor from '@/editor/components/ProjectCodeDiffEditor';
+import ShortcutCheatSheet from '@/editor/components/ShortcutCheatSheet';
 import { parseEditorExecutionErrors } from '@/editor/lib/error-utils';
 import { createLocalEditorProject, getLocalEditorProject, saveLocalEditorProject } from '@/editor/lib/local-dev-projects';
 import { getEditorLanguageFromPath } from '@/editor/lib/project-templates';
-import { runPythonInBrowser, warmPyodideRuntime } from '@/src/features/rooms/pyodide-runtime';
+import {
+  appendExecutionSummary,
+  formatExecutionTime,
+  runPythonInBrowser,
+  stopPythonInBrowserExecution,
+  type PythonRunProgress,
+  warmPyodideRuntime,
+} from '@/src/features/rooms/pyodide-runtime';
 import type {
   EditorAssistRequest,
   EditorAssistResponse,
@@ -60,8 +77,10 @@ type EditorWorkspaceProps = {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 type WorkspaceStatus = 'loading' | 'ready' | 'error';
-type PythonRunStatus = 'idle' | 'running' | 'success' | 'error';
+type PythonRunStatus = 'idle' | 'running' | 'success' | 'error' | 'stopped';
 type BottomPanelTab = 'terminal' | 'problems';
+type EditorViewMode = 'code' | 'diff';
+type EditorThemeMode = 'dark' | 'light' | 'contrast';
 type PendingFileAction =
   | { type: 'rename'; path: string }
   | { type: 'delete'; path: string }
@@ -72,9 +91,22 @@ type PythonRunOutput = {
   stdout: string;
   stderr: string;
   output: string;
+  durationMs: number | null;
 };
 
 type WorkspaceFile = Pick<EditorProjectFile, 'path' | 'language' | 'content' | 'sortOrder' | 'isEntry'>;
+
+type EditorQuickSettings = {
+  fontSize: number;
+  minimapEnabled: boolean;
+  wordWrap: 'off' | 'on';
+};
+
+type AssistConversationMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+};
 
 type TerminalLine = {
   id: string;
@@ -114,19 +146,59 @@ const DEFAULT_BOTTOM_PANEL_HEIGHT = 200;
 const MIN_BOTTOM_PANEL_HEIGHT = 120;
 const MIN_CENTER_COLUMN_WIDTH = 340;
 const AI_PANEL_WIDTH = 320;
+const DEFAULT_EDITOR_SETTINGS: EditorQuickSettings = {
+  fontSize: 13,
+  minimapEnabled: true,
+  wordWrap: 'off',
+};
+const LANGUAGE_OPTIONS: Array<{
+  value: EditorFileLanguage;
+  label: string;
+}> = [
+  { value: 'python', label: 'Python' },
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'html', label: 'HTML' },
+  { value: 'css', label: 'CSS' },
+  { value: 'json', label: 'JSON' },
+  { value: 'markdown', label: 'Markdown' },
+  { value: 'plaintext', label: 'Plain Text' },
+];
+const THEME_OPTIONS: Array<{
+  value: EditorThemeMode;
+  label: string;
+  description: string;
+}> = [
+  { value: 'dark', label: 'Dark', description: 'Obsidian default' },
+  { value: 'light', label: 'Light', description: 'Paper studio' },
+  { value: 'contrast', label: 'High Contrast', description: 'Max legibility' },
+];
 const ASSIST_SUGGESTIONS = [
   {
-    label: 'Explain',
-    value: 'Explain the active file and highlight anything important to understand before I change it.',
+    label: 'Explain this',
+    value: 'Explain this code in practical terms and call out the parts I should understand first.',
   },
   {
-    label: 'Debug',
-    value: 'Help me debug the current file using the active output and point to the most likely fix.',
+    label: 'Fix bugs',
+    value: 'Review the active file and point out the most likely bug or runtime issue, then suggest the smallest fix.',
   },
   {
-    label: 'Refactor',
-    value: 'Suggest a small refactor that improves clarity without changing behavior.',
+    label: 'Add comments',
+    value: 'Add concise comments only where the code is genuinely hard to parse, and keep them short.',
   },
+  {
+    label: 'Optimize',
+    value: 'Suggest one or two focused optimizations that improve clarity, speed, or maintainability without changing behavior.',
+  },
+] as const;
+const SHORTCUTS = [
+  { keys: 'Ctrl/Cmd + S', action: 'Save the current project.' },
+  { keys: 'Ctrl/Cmd + P', action: 'Open the command palette.' },
+  { keys: 'Ctrl/Cmd + N', action: 'Create a new file.' },
+  { keys: 'Ctrl/Cmd + H', action: 'Open Monaco search and replace.' },
+  { keys: 'Ctrl/Cmd + Enter', action: 'Send the current AI prompt.' },
+  { keys: 'Alt + Shift + D', action: 'Toggle diff view for the active file.' },
+  { keys: '?', action: 'Open this keyboard shortcuts sheet.' },
 ] as const;
 const SUPPORTED_NEW_FILE_EXTENSIONS = ['.py', '.html', '.css', '.js', '.ts', '.tsx', '.json', '.md', '.mdx', '.txt'] as const;
 
@@ -446,6 +518,23 @@ function getEditorFileIndicator(path: string) {
   return getFileIndicator(path);
 }
 
+function getProgressPercent(stage: PythonRunProgress['stage'] | null) {
+  switch (stage) {
+    case 'downloading-runtime':
+      return 20;
+    case 'initializing-runtime':
+      return 45;
+    case 'ready':
+      return 100;
+    case 'loading-imports':
+      return 72;
+    case 'running':
+      return 92;
+    default:
+      return 0;
+  }
+}
+
 function buildEditorTerminalLines(output: PythonRunOutput): TerminalLine[] {
   const lines: TerminalLine[] = [];
 
@@ -475,6 +564,29 @@ function buildEditorTerminalLines(output: PythonRunOutput): TerminalLine[] {
   }));
 }
 
+function createConversationMessage(role: 'user' | 'assistant', content: string): AssistConversationMessage {
+  const id =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  return {
+    id,
+    role,
+    content,
+  };
+}
+
+function extractAssistInsertionText(response: string) {
+  const fencedCodeBlock = response.match(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/);
+
+  if (fencedCodeBlock?.[1]) {
+    return fencedCodeBlock[1].trim();
+  }
+
+  return response.trim();
+}
+
 function getDefaultNewFileContent(language: EditorFileLanguage) {
   switch (language) {
     case 'python':
@@ -495,6 +607,62 @@ function getDefaultNewFileContent(language: EditorFileLanguage) {
       return '';
     default:
       return '';
+  }
+}
+
+function getThemeVariables(theme: EditorThemeMode) {
+  switch (theme) {
+    case 'light':
+      return {
+        '--bg-base': '#f5f7fb',
+        '--bg-surface': '#ffffff',
+        '--bg-elevated': '#eef2ff',
+        '--bg-overlay': '#e8eefc',
+        '--border-subtle': '#d6dbe8',
+        '--border-accent': '#4f46e5',
+        '--accent-primary': '#4f46e5',
+        '--accent-glow': '#4338ca',
+        '--text-primary': '#0f172a',
+        '--text-secondary': '#334155',
+        '--text-muted': '#64748b',
+        '--green': '#059669',
+        '--red': '#dc2626',
+        '--yellow': '#d97706',
+      } as const;
+    case 'contrast':
+      return {
+        '--bg-base': '#000000',
+        '--bg-surface': '#030712',
+        '--bg-elevated': '#111827',
+        '--bg-overlay': '#0f172a',
+        '--border-subtle': '#334155',
+        '--border-accent': '#facc15',
+        '--accent-primary': '#facc15',
+        '--accent-glow': '#fde68a',
+        '--text-primary': '#ffffff',
+        '--text-secondary': '#e2e8f0',
+        '--text-muted': '#93c5fd',
+        '--green': '#22c55e',
+        '--red': '#fb7185',
+        '--yellow': '#facc15',
+      } as const;
+    default:
+      return {
+        '--bg-base': '#08080f',
+        '--bg-surface': '#0d0d18',
+        '--bg-elevated': '#11112a',
+        '--bg-overlay': '#1a1a35',
+        '--border-subtle': '#1e1e38',
+        '--border-accent': '#6366f1',
+        '--accent-primary': '#6366f1',
+        '--accent-glow': '#818cf8',
+        '--text-primary': '#e2e8f0',
+        '--text-secondary': '#6b7280',
+        '--text-muted': '#374151',
+        '--green': '#4ade80',
+        '--red': '#f87171',
+        '--yellow': '#facc15',
+      } as const;
   }
 }
 
@@ -530,22 +698,31 @@ export default function EditorWorkspace({
   const [assistOpen, setAssistOpen] = useState(false);
   const [assistQuestion, setAssistQuestion] = useState('');
   const [assistResponse, setAssistResponse] = useState('');
+  const [assistMessages, setAssistMessages] = useState<AssistConversationMessage[]>([]);
   const [assistError, setAssistError] = useState<string | null>(null);
   const [assistLoading, setAssistLoading] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [commandPaletteQuery, setCommandPaletteQuery] = useState('');
   const [commandPaletteHighlightIndex, setCommandPaletteHighlightIndex] = useState(0);
+  const [showShortcutSheet, setShowShortcutSheet] = useState(false);
+  const [showViewControls, setShowViewControls] = useState(false);
+  const [editorViewMode, setEditorViewMode] = useState<EditorViewMode>('code');
+  const [editorTheme, setEditorTheme] = useState<EditorThemeMode>('dark');
+  const [editorSettings, setEditorSettings] = useState(DEFAULT_EDITOR_SETTINGS);
+  const [pythonRuntimeProgress, setPythonRuntimeProgress] = useState<PythonRunProgress | null>(null);
   const [pythonRunOutput, setPythonRunOutput] = useState<PythonRunOutput>({
     status: 'idle',
     stdout: '',
     stderr: '',
     output: initialOutputText,
+    durationMs: null,
   });
   const [jsRunOutput, setJsRunOutput] = useState<PythonRunOutput>({
     status: 'idle',
     stdout: '',
     stderr: '',
     output: initialOutputText,
+    durationMs: null,
   });
   const [jsRunnerSrcDoc, setJsRunnerSrcDoc] = useState('');
   const [previewSrcDoc, setPreviewSrcDoc] = useState('');
@@ -568,6 +745,7 @@ export default function EditorWorkspace({
   const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(DEFAULT_BOTTOM_PANEL_HEIGHT);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const [selectionVersion, setSelectionVersion] = useState(0);
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -577,8 +755,10 @@ export default function EditorWorkspace({
   const commandPaletteInputRef = useRef<HTMLInputElement | null>(null);
   const jsRunnerIframeRef = useRef<HTMLIFrameElement | null>(null);
   const jsRunnerRunIdRef = useRef<string | null>(null);
+  const jsRunStartedAtRef = useRef<number | null>(null);
   const editorColumnRef = useRef<HTMLDivElement | null>(null);
   const layoutRef = useRef<HTMLDivElement | null>(null);
+  const viewControlsRef = useRef<HTMLDivElement | null>(null);
   const bottomPanelHeightRef = useRef(DEFAULT_BOTTOM_PANEL_HEIGHT);
   const sidebarWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
   const lastExpandedPanelHeightRef = useRef(DEFAULT_BOTTOM_PANEL_HEIGHT);
@@ -605,8 +785,8 @@ export default function EditorWorkspace({
       return result;
     }, []);
   }, [files, openFilePaths]);
-  const isPythonProject = project?.templateKey === 'python-playground';
-  const isWebProject = project?.templateKey === 'web-playground';
+  const isWebProject = files.some((file) => file.language === 'html');
+  const isPythonProject = !isWebProject && entryFile?.language === 'python';
   const isJsProject =
     !isPythonProject &&
     !isWebProject &&
@@ -634,7 +814,13 @@ export default function EditorWorkspace({
   const panelIsCollapsed = bottomPanelHeight === 0;
   const activeFileName = activeFile ? getFileName(activeFile.path) : 'No file selected';
   const activeFileIndicator = activeFile ? getEditorFileIndicator(activeFile.path) : null;
-  const projectKindLabel = isWebProject ? 'WEB PLAYGROUND' : isJsProject ? 'JS PLAYGROUND' : 'PYTHON PLAYGROUND';
+  const projectKindLabel = isWebProject
+    ? 'WEB PLAYGROUND'
+    : isJsProject
+      ? 'JS PLAYGROUND'
+      : isPythonProject
+        ? 'PYTHON PLAYGROUND'
+        : 'EDITOR';
   const isRunning = activeRunOutput.status === 'running';
   const runButtonLabel = isRunning ? 'RUNNING...' : 'RUN';
   const panelStatusLabel = isWebProject
@@ -645,6 +831,8 @@ export default function EditorWorkspace({
       ? 'Process running'
       : activeRunOutput.status === 'error'
         ? 'Run failed'
+        : activeRunOutput.status === 'stopped'
+          ? 'Run stopped'
         : activeRunOutput.status === 'success'
           ? 'Last run finished'
           : 'Ready';
@@ -656,7 +844,39 @@ export default function EditorWorkspace({
       ? '#818cf8'
       : activeRunOutput.status === 'error'
         ? '#f87171'
+        : activeRunOutput.status === 'stopped'
+          ? '#facc15'
         : '#4ade80';
+  const currentLanguageLabel = activeFile
+    ? LANGUAGE_OPTIONS.find((language) => language.value === activeFile.language)?.label ?? activeFile.language
+    : 'Language';
+  const savedActiveFile = useMemo(
+    () => (activeFile ? savedFiles.find((file) => file.path === activeFile.path) ?? null : null),
+    [activeFile, savedFiles],
+  );
+  const canShowDiff = Boolean(activeFile && savedActiveFile && savedActiveFile.content !== activeFile.content);
+  const executionTimeLabel =
+    activeRunOutput.durationMs !== null ? `Last run: ${formatExecutionTime(activeRunOutput.durationMs)}` : null;
+  const pythonProgressPercent = getProgressPercent(pythonRuntimeProgress?.stage ?? null);
+  const assistSelectionSummary = useMemo(() => {
+    const model = editorRef.current?.getModel();
+    const selection = editorRef.current?.getSelection();
+
+    if (!model || !selection || selection.isEmpty()) {
+      return 'No selection';
+    }
+
+    const startLine = selection.startLineNumber;
+    const endLine = selection.endLineNumber;
+    const selectedText = model.getValueInRange(selection);
+    const selectedCharacterCount = selectedText.trim().length;
+
+    return selectedCharacterCount > 0
+      ? `Lines ${startLine}-${endLine} • ${selectedCharacterCount} chars selected`
+      : `Lines ${startLine}-${endLine}`;
+  }, [mountedEditor, activeFile?.content, selectionVersion]);
+  const editorThemeVariables = getThemeVariables(editorTheme);
+  const overlayTheme = editorTheme === 'light' ? 'light' : 'dark';
 
   const filteredFiles = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -716,6 +936,95 @@ export default function EditorWorkspace({
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedTheme = window.localStorage.getItem('yantra.editor.theme');
+    const storedSettings = window.localStorage.getItem('yantra.editor.settings');
+
+    if (storedTheme === 'dark' || storedTheme === 'light' || storedTheme === 'contrast') {
+      setEditorTheme(storedTheme);
+    }
+
+    if (storedSettings) {
+      try {
+        const parsed = JSON.parse(storedSettings) as Partial<EditorQuickSettings>;
+
+        setEditorSettings({
+          fontSize:
+            typeof parsed.fontSize === 'number' && Number.isFinite(parsed.fontSize)
+              ? Math.max(11, Math.min(22, parsed.fontSize))
+              : DEFAULT_EDITOR_SETTINGS.fontSize,
+          minimapEnabled:
+            typeof parsed.minimapEnabled === 'boolean'
+              ? parsed.minimapEnabled
+              : DEFAULT_EDITOR_SETTINGS.minimapEnabled,
+          wordWrap: parsed.wordWrap === 'on' ? 'on' : DEFAULT_EDITOR_SETTINGS.wordWrap,
+        });
+      } catch {
+        // Ignore malformed local settings and keep defaults.
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem('yantra.editor.theme', editorTheme);
+  }, [editorTheme]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem('yantra.editor.settings', JSON.stringify(editorSettings));
+  }, [editorSettings]);
+
+  useEffect(() => {
+    if (canShowDiff) {
+      return;
+    }
+
+    setEditorViewMode('code');
+  }, [canShowDiff]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (viewControlsRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
+      setShowViewControls(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    const activeEditor = editorRef.current ?? mountedEditor;
+
+    if (!activeEditor) {
+      return;
+    }
+
+    const selectionListener = activeEditor.onDidChangeCursorSelection(() => {
+      setSelectionVersion((current) => current + 1);
+    });
+
+    return () => {
+      selectionListener.dispose();
+    };
+  }, [mountedEditor, activeFile?.path]);
+
+  useEffect(() => {
     if (!isEditingTitle) {
       return;
     }
@@ -773,12 +1082,15 @@ export default function EditorWorkspace({
     setIsEditingTitle(false);
     setSaveStatus('idle');
     setAssistResponse('');
+    setAssistMessages([]);
     setAssistError(null);
     setShareUrl('');
     setShareError(null);
+    setEditorViewMode('code');
     setPreviewSrcDoc('');
     setJsRunnerSrcDoc('');
     jsRunnerRunIdRef.current = null;
+    setPythonRuntimeProgress(null);
     setIsCreatingFile(false);
     setNewFilePath('');
     setNewFileError(null);
@@ -787,12 +1099,14 @@ export default function EditorWorkspace({
       stdout: '',
       stderr: '',
       output: getDefaultRunOutputText(projectDetails.project.templateKey, nextActiveFile),
+      durationMs: null,
     });
     setJsRunOutput({
       status: 'idle',
       stdout: '',
       stderr: '',
       output: getDefaultRunOutputText(projectDetails.project.templateKey, nextActiveFile),
+      durationMs: null,
     });
     setWorkspaceStatus('ready');
   }, []);
@@ -907,10 +1221,17 @@ export default function EditorWorkspace({
 
   useEffect(() => {
     if (!isPythonProject) {
+      setPythonRuntimeProgress(null);
       return;
     }
 
-    void warmPyodideRuntime();
+    void warmPyodideRuntime({
+      onProgress: (progress) => {
+        setPythonRuntimeProgress(progress);
+      },
+    }).catch(() => {
+      // Warmup is opportunistic; the first run will still surface real errors.
+    });
   }, [isPythonProject, project?.id]);
 
   useEffect(() => {
@@ -953,11 +1274,22 @@ export default function EditorWorkspace({
       }
 
       if (message.type === 'done') {
+        const durationMs =
+          jsRunStartedAtRef.current === null ? null : Math.round(performance.now() - jsRunStartedAtRef.current);
+
         setJsRunOutput((currentOutput) => ({
           ...currentOutput,
           status: currentOutput.stderr.trim().length > 0 ? 'error' : 'success',
-          output: buildExecutionOutput(currentOutput.stdout, currentOutput.stderr, 'JavaScript finished without output.'),
+          output:
+            durationMs === null
+              ? buildExecutionOutput(currentOutput.stdout, currentOutput.stderr, 'JavaScript finished without output.')
+              : appendExecutionSummary(
+                  buildExecutionOutput(currentOutput.stdout, currentOutput.stderr, 'JavaScript finished without output.'),
+                  durationMs,
+                ),
+          durationMs,
         }));
+        jsRunStartedAtRef.current = null;
       }
     };
 
@@ -1366,6 +1698,69 @@ export default function EditorWorkspace({
     await persistFileSet(nextFiles);
   }
 
+  async function handleLanguageChange(nextLanguage: EditorFileLanguage) {
+    if (!activeFile) {
+      return;
+    }
+
+    const nextFiles = files.map((file) =>
+      file.path === activeFile.path
+        ? {
+            ...file,
+            language: nextLanguage,
+          }
+        : file,
+    );
+
+    setFiles(nextFiles);
+    await persistFileSet(nextFiles);
+  }
+
+  function openSearchReplace() {
+    const activeEditor = editorRef.current ?? mountedEditor;
+
+    if (!activeEditor) {
+      return;
+    }
+
+    activeEditor.focus();
+    activeEditor.getAction('editor.action.startFindReplaceAction')?.run();
+  }
+
+  function handleInsertAssistSuggestion(mode: 'replace-selection' | 'insert-at-cursor') {
+    const activeEditor = editorRef.current ?? mountedEditor;
+    const insertionText = extractAssistInsertionText(assistResponse);
+
+    if (!activeEditor || !insertionText) {
+      return;
+    }
+
+    const selection = activeEditor.getSelection();
+
+    if (!selection) {
+      return;
+    }
+
+    const targetRange =
+      mode === 'replace-selection' && !selection.isEmpty()
+        ? selection
+        : {
+            startLineNumber: selection.positionLineNumber,
+            startColumn: selection.positionColumn,
+            endLineNumber: selection.positionLineNumber,
+            endColumn: selection.positionColumn,
+          };
+
+    activeEditor.executeEdits('yantra-ai-insert', [
+      {
+        range: targetRange,
+        text: insertionText,
+        forceMoveMarkers: true,
+      },
+    ]);
+    activeEditor.focus();
+  }
+
   async function handleRun() {
     if (!entryFile) {
       return;
@@ -1378,22 +1773,40 @@ export default function EditorWorkspace({
     if (isPythonProject) {
       jsRunnerRunIdRef.current = null;
       setJsRunnerSrcDoc('');
+      setPythonRuntimeProgress({
+        stage: 'running',
+        message: 'Executing Python in-browser...',
+      });
       setPythonRunOutput({
         status: 'running',
         stdout: '',
         stderr: '',
         output: 'Executing your Python file in-browser...',
+        durationMs: null,
       });
       setActiveBottomPanelTab('terminal');
 
-      const result = await runPythonInBrowser(entryFile.content, stdin);
+      const result = await runPythonInBrowser(entryFile.content, stdin, {
+        onProgress: (progress) => {
+          setPythonRuntimeProgress(progress);
+        },
+      });
 
       setPythonRunOutput({
         status: result.status,
         stdout: result.stdout,
         stderr: result.stderr,
-        output: result.output,
+        output: appendExecutionSummary(result.output, result.durationMs),
+        durationMs: result.durationMs,
       });
+      setPythonRuntimeProgress(
+        result.status === 'stopped'
+          ? null
+          : {
+              stage: 'ready',
+              message: 'Python runtime ready.',
+            },
+      );
       return;
     }
 
@@ -1418,6 +1831,7 @@ export default function EditorWorkspace({
               stdout: '',
               stderr: transpiled.diagnostics,
               output: transpiled.diagnostics,
+              durationMs: null,
             });
             setActiveBottomPanelTab('terminal');
             return;
@@ -1432,6 +1846,7 @@ export default function EditorWorkspace({
             stdout: '',
             stderr: message,
             output: message,
+            durationMs: null,
           });
           setActiveBottomPanelTab('terminal');
           return;
@@ -1439,11 +1854,13 @@ export default function EditorWorkspace({
       }
 
       jsRunnerRunIdRef.current = nextRunId;
+      jsRunStartedAtRef.current = performance.now();
       setJsRunOutput({
         status: 'running',
         stdout: '',
         stderr: '',
         output: 'Running your JavaScript or TypeScript file in-browser...',
+        durationMs: null,
       });
       setActiveBottomPanelTab('terminal');
       setJsRunnerSrcDoc(buildJsRunnerDocument(executableSource, nextRunId));
@@ -1455,7 +1872,38 @@ export default function EditorWorkspace({
       setJsRunnerSrcDoc('');
       setPreviewSrcDoc(buildWebPreviewDocument(files));
       setActiveBottomPanelTab('terminal');
+      setJsRunOutput({
+        status: 'idle',
+        stdout: '',
+        stderr: '',
+        output: 'Preview refreshed.',
+        durationMs: null,
+      });
+      return;
     }
+
+    setPythonRunOutput({
+      status: 'error',
+      stdout: '',
+      stderr: '',
+      output: `Execution is not configured for ${entryFile.language} files yet.`,
+      durationMs: null,
+    });
+    setActiveBottomPanelTab('terminal');
+  }
+
+  function handleStopExecution() {
+    if (!isPythonProject) {
+      return;
+    }
+
+    const didStop = stopPythonInBrowserExecution();
+
+    if (!didStop) {
+      return;
+    }
+
+    setPythonRuntimeProgress(null);
   }
 
   const handleManualSave = useCallback(async () => {
@@ -1493,6 +1941,24 @@ export default function EditorWorkspace({
         return;
       }
 
+      if (isModifierPressed && event.key.toLowerCase() === 'h') {
+        event.preventDefault();
+        openSearchReplace();
+        return;
+      }
+
+      if (event.key === '?' && !isEditableTarget) {
+        event.preventDefault();
+        setShowShortcutSheet(true);
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'd' && event.altKey && event.shiftKey && !isEditableTarget) {
+        event.preventDefault();
+        setEditorViewMode((currentMode) => (currentMode === 'diff' ? 'code' : 'diff'));
+        return;
+      }
+
       if (commandPaletteOpen) {
         if (event.key === 'Escape') {
           event.preventDefault();
@@ -1524,7 +1990,7 @@ export default function EditorWorkspace({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [commandPaletteOpen, handleManualSave, isEditingTitle, isTitleDirty, savedProjectTitle]);
+  }, [commandPaletteOpen, handleManualSave, isEditingTitle, isTitleDirty, mountedEditor, savedProjectTitle]);
 
   useEffect(() => {
     if (!commandPaletteOpen) {
@@ -1660,10 +2126,12 @@ export default function EditorWorkspace({
     const model = editorRef.current?.getModel();
     const selection = editorRef.current?.getSelection();
     const selectedText = model && selection ? model.getValueInRange(selection).trim() : '';
+    const nextUserMessage = createConversationMessage('user', assistQuestion.trim());
 
     setAssistLoading(true);
     setAssistError(null);
     setAssistResponse('');
+    setAssistMessages((currentMessages) => [...currentMessages, nextUserMessage]);
 
     try {
       const response = await readJson<EditorAssistResponse>(
@@ -1678,12 +2146,22 @@ export default function EditorWorkspace({
             selectedText,
             learnerLevel: profile.skillLevel,
             question: assistQuestion.trim(),
+            history: assistMessages.map((message) => ({
+              role: message.role,
+              content: message.content,
+            })),
           } satisfies EditorAssistRequest),
         }),
       );
 
       setAssistResponse(response.reply);
+      setAssistMessages((currentMessages) => [
+        ...currentMessages,
+        createConversationMessage('assistant', response.reply),
+      ]);
+      setAssistQuestion('');
     } catch (error) {
+      setAssistMessages((currentMessages) => currentMessages.filter((message) => message.id !== nextUserMessage.id));
       setAssistError(error instanceof Error ? error.message : 'Yantra assist is unavailable right now.');
     } finally {
       setAssistLoading(false);
@@ -1874,6 +2352,17 @@ export default function EditorWorkspace({
       keywords: 'save sync persist project',
       onSelect: () => handleManualSave(),
     },
+    ...(isPythonProject && isRunning
+      ? [
+          {
+            id: 'stop-python',
+            label: 'Stop Python execution',
+            description: 'Terminate the current Python run.',
+            keywords: 'stop python cancel execution runtime',
+            onSelect: () => handleStopExecution(),
+          },
+        ]
+      : []),
     {
       id: 'share',
       label: 'Share',
@@ -1901,6 +2390,27 @@ export default function EditorWorkspace({
       description: assistOpen ? 'Close the AI assist panel.' : 'Open the AI assist panel.',
       keywords: 'toggle ai assist copilot chat',
       onSelect: () => setAssistOpen((current) => !current),
+    },
+    {
+      id: 'search-replace',
+      label: 'Search and Replace',
+      description: 'Open Monaco search and replace.',
+      keywords: 'search replace find ctrl h',
+      onSelect: () => openSearchReplace(),
+    },
+    {
+      id: 'toggle-diff',
+      label: 'Toggle Diff View',
+      description: canShowDiff ? 'Compare active file against the saved version.' : 'No unsaved changes in the active file.',
+      keywords: 'diff compare changes modified saved',
+      onSelect: () => setEditorViewMode((current) => (current === 'diff' ? 'code' : 'diff')),
+    },
+    {
+      id: 'open-shortcuts',
+      label: 'Keyboard Shortcuts',
+      description: 'Open the shortcut cheat sheet.',
+      keywords: 'keyboard shortcuts help cheat sheet',
+      onSelect: () => setShowShortcutSheet(true),
     },
     ...files.map((file) => ({
       id: `open-file-${file.path}`,
@@ -1953,9 +2463,44 @@ export default function EditorWorkspace({
         className="flex h-screen items-center justify-center px-6"
         style={{ backgroundColor: '#08080f', color: '#e2e8f0', fontFamily: 'Inter, Geist, system-ui, sans-serif' }}
       >
-        <div className="flex items-center gap-3 rounded-2xl border px-5 py-4 text-sm shadow-[0_18px_60px_rgba(0,0,0,0.45)]" style={{ borderColor: '#1e1e38', backgroundColor: '#0d0d18' }}>
-          <LoaderCircle className="h-4 w-4 animate-spin" style={{ color: '#818cf8' }} />
-          Loading editor workspace
+        <div
+          className="w-full max-w-5xl overflow-hidden rounded-[2rem] border shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
+          style={{ borderColor: '#1e1e38', backgroundColor: '#0d0d18' }}
+        >
+          <div className="flex h-11 items-center justify-between border-b px-5" style={{ borderColor: '#1e1e38' }}>
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.12em]" style={{ color: '#818cf8' }}>
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+              Loading editor workspace
+            </div>
+            <div className="h-2 w-24 rounded-full bg-[#1e1e38]" />
+          </div>
+          <div className="grid min-h-[32rem] md:grid-cols-[220px_1fr]">
+            <div className="border-r p-4" style={{ borderColor: '#1e1e38' }}>
+              <div className="h-3 w-20 rounded-full bg-[#1e1e38]" />
+              <div className="mt-4 space-y-3">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="h-9 rounded-xl bg-[#11112a]" />
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <div className="border-b p-4" style={{ borderColor: '#1e1e38' }}>
+                <div className="h-3 w-40 rounded-full bg-[#1e1e38]" />
+              </div>
+              <div className="flex-1 p-4">
+                <div className="h-full rounded-[1.5rem] bg-[#08080f] p-4">
+                  <div className="space-y-3 font-mono text-[12px]">
+                    {Array.from({ length: 12 }).map((_, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <div className="h-3 w-5 rounded-full bg-[#1e1e38]" />
+                        <div className="h-3 rounded-full bg-[#11112a]" style={{ width: `${40 + (index % 5) * 10}%` }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     );
@@ -1987,7 +2532,7 @@ export default function EditorWorkspace({
     <div
       ref={layoutRef}
       className="yantra-shell flex h-screen flex-col overflow-hidden selection:text-white"
-      style={{ fontFamily: 'Inter, Geist, system-ui, sans-serif' }}
+      style={{ fontFamily: 'Inter, Geist, system-ui, sans-serif', ...editorThemeVariables } as CSSProperties}
     >
       <header className="yantra-header flex h-11 shrink-0 items-stretch">
         <div className="flex min-w-0 shrink-0 items-center gap-2 px-4">
@@ -2137,12 +2682,167 @@ export default function EditorWorkspace({
               <span className="inline-flex h-[5px] w-[5px] rounded-full" style={{ backgroundColor: panelStatusDotColor }} />
               {panelStatusLabel}
             </span>
+            {executionTimeLabel ? (
+              <>
+                <span className="yantra-divider">|</span>
+                <span className="yantra-status-text">{executionTimeLabel}</span>
+              </>
+            ) : null}
           </div>
           {devBypass ? (
             <div className="yantra-local-badge hidden sm:block">
               LOCAL
             </div>
           ) : null}
+
+          {activeFile ? (
+            <label className="hidden items-center gap-2 rounded-full border border-[color:var(--border-subtle)] bg-[var(--bg-base)] px-3 py-1.5 text-[11px] text-[var(--text-secondary)] md:flex">
+              <Languages className="h-3.5 w-3.5 text-[var(--accent-glow)]" />
+              <select
+                value={activeFile.language}
+                onChange={(event) => {
+                  void handleLanguageChange(event.target.value as EditorFileLanguage);
+                }}
+                className="yantra-toolbar-select"
+                aria-label="Change active file language"
+                title={`Current language: ${currentLanguageLabel}`}
+              >
+                {LANGUAGE_OPTIONS.map((language) => (
+                  <option key={language.value} value={language.value}>
+                    {language.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          <div ref={viewControlsRef} className="relative">
+            <button
+              type="button"
+              className="yantra-icon-button inline-flex h-8 w-8 items-center justify-center"
+              onClick={() => setShowViewControls((current) => !current)}
+              aria-label="Open editor view controls"
+              title="Editor view controls"
+            >
+              <Settings2 className="h-4 w-4" />
+            </button>
+
+            {showViewControls ? (
+              <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[20rem] rounded-[1.25rem] border border-[color:var(--border-subtle)] bg-[var(--bg-surface)] p-4 shadow-[0_22px_60px_rgba(0,0,0,0.42)]">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Quick Settings</div>
+                <div className="mt-3 grid gap-2">
+                  <button
+                    type="button"
+                    className="yantra-settings-row"
+                    onClick={() =>
+                      setEditorSettings((current) => ({
+                        ...current,
+                        wordWrap: current.wordWrap === 'on' ? 'off' : 'on',
+                      }))
+                    }
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <WrapText className="h-3.5 w-3.5" />
+                      Wrap lines
+                    </span>
+                    <span>{editorSettings.wordWrap === 'on' ? 'On' : 'Off'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="yantra-settings-row"
+                    onClick={() =>
+                      setEditorSettings((current) => ({
+                        ...current,
+                        minimapEnabled: !current.minimapEnabled,
+                      }))
+                    }
+                  >
+                    <span>Minimap</span>
+                    <span>{editorSettings.minimapEnabled ? 'On' : 'Off'}</span>
+                  </button>
+
+                  <div className="yantra-settings-row">
+                    <span>Font size</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="yantra-icon-button inline-flex h-7 w-7 items-center justify-center"
+                        onClick={() =>
+                          setEditorSettings((current) => ({
+                            ...current,
+                            fontSize: Math.max(11, current.fontSize - 1),
+                          }))
+                        }
+                        aria-label="Decrease font size"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="min-w-[2rem] text-center">{editorSettings.fontSize}</span>
+                      <button
+                        type="button"
+                        className="yantra-icon-button inline-flex h-7 w-7 items-center justify-center"
+                        onClick={() =>
+                          setEditorSettings((current) => ({
+                            ...current,
+                            fontSize: Math.min(22, current.fontSize + 1),
+                          }))
+                        }
+                        aria-label="Increase font size"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Themes</div>
+                <div className="mt-3 grid gap-2">
+                  {THEME_OPTIONS.map((themeOption) => (
+                    <button
+                      key={themeOption.value}
+                      type="button"
+                      className={`yantra-settings-row ${editorTheme === themeOption.value ? 'is-active' : ''}`}
+                      onClick={() => setEditorTheme(themeOption.value)}
+                    >
+                      <span>{themeOption.label}</span>
+                      <span>{themeOption.description}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid gap-2">
+                  <button
+                    type="button"
+                    className={`yantra-settings-row ${editorViewMode === 'diff' ? 'is-active' : ''}`}
+                    onClick={() => setEditorViewMode((current) => (current === 'diff' ? 'code' : 'diff'))}
+                    disabled={!canShowDiff}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Diff className="h-3.5 w-3.5" />
+                      Diff view
+                    </span>
+                    <span>{canShowDiff ? (editorViewMode === 'diff' ? 'On' : 'Off') : 'No changes'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="yantra-settings-row"
+                    onClick={() => {
+                      setShowShortcutSheet(true);
+                      setShowViewControls(false);
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Keyboard className="h-3.5 w-3.5" />
+                      Keyboard shortcuts
+                    </span>
+                    <span>Open</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
 
           <button
             type="button"
@@ -2157,6 +2857,17 @@ export default function EditorWorkspace({
             <Play className="h-3.5 w-3.5 fill-current" />
             {runButtonLabel}
           </button>
+
+          {isPythonProject && isRunning ? (
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-2 rounded-full border border-[rgba(248,113,113,0.28)] bg-[rgba(127,29,29,0.22)] px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--red)]"
+              onClick={handleStopExecution}
+            >
+              <Pause className="h-3.5 w-3.5 fill-current" />
+              Stop
+            </button>
+          ) : null}
 
           <button
             type="button"
@@ -2356,7 +3067,7 @@ export default function EditorWorkspace({
                       aria-label="Search files"
                     />
                     <div className="mt-2 text-[11px] leading-5 text-[var(--text-muted)]">
-                      Shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+P search, Cmd/Ctrl+N new file.
+                      Shortcuts: Cmd/Ctrl+S save, Cmd/Ctrl+P palette, Cmd/Ctrl+H replace, ? help.
                     </div>
                   </div>
 
@@ -2572,29 +3283,43 @@ export default function EditorWorkspace({
             </div>
 
             <div className="relative min-h-0 flex-1">
-              <ProjectCodeEditor
-                file={activeFile}
-                theme="dark"
-                errorText={runErrorText}
-                onChange={handleFileChange}
-                onEditorReady={handleEditorReady}
-                onMonacoReady={handleMonacoReady}
-              />
-              <HoverExplain
-                editor={editorRef.current ?? mountedEditor}
-                monaco={monacoInstance}
-                file={activeOverlayFile}
-                stderr={pythonRunOutput.stderr}
-                theme="dark"
-              />
-              <InlineErrorFix
-                editor={editorRef.current ?? mountedEditor}
-                monaco={monacoInstance}
-                file={activeOverlayFile}
-                stderr={pythonRunOutput.stderr}
-                theme="dark"
-                onApplyFix={handleApplyFix}
-              />
+              {editorViewMode === 'diff' && activeFile && savedActiveFile ? (
+                <ProjectCodeDiffEditor
+                  filePath={activeFile.path}
+                  language={activeFile.language}
+                  original={savedActiveFile.content}
+                  modified={activeFile.content}
+                  theme={editorTheme}
+                  settings={editorSettings}
+                />
+              ) : (
+                <>
+                  <ProjectCodeEditor
+                    file={activeFile}
+                    theme={editorTheme}
+                    settings={editorSettings}
+                    errorText={runErrorText}
+                    onChange={handleFileChange}
+                    onEditorReady={handleEditorReady}
+                    onMonacoReady={handleMonacoReady}
+                  />
+                  <HoverExplain
+                    editor={editorRef.current ?? mountedEditor}
+                    monaco={monacoInstance}
+                    file={activeOverlayFile}
+                    stderr={pythonRunOutput.stderr}
+                    theme={overlayTheme}
+                  />
+                  <InlineErrorFix
+                    editor={editorRef.current ?? mountedEditor}
+                    monaco={monacoInstance}
+                    file={activeOverlayFile}
+                    stderr={pythonRunOutput.stderr}
+                    theme={overlayTheme}
+                    onApplyFix={handleApplyFix}
+                  />
+                </>
+              )}
             </div>
 
             {panelIsCollapsed ? (
@@ -2673,6 +3398,21 @@ export default function EditorWorkspace({
                       ) : (
                         <div className="flex h-full min-h-0 flex-col bg-[#060609]">
                           <div className="shrink-0 border-b border-[color:var(--border-subtle)] px-4 py-3">
+                            {isPythonProject && pythonRuntimeProgress ? (
+                              <div className="mb-3 overflow-hidden rounded-xl border border-[color:var(--border-subtle)] bg-[rgba(15,23,42,0.28)] px-4 py-3">
+                                <div className="flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                                  <span>Pyodide status</span>
+                                  <span>{pythonRuntimeProgress.message}</span>
+                                </div>
+                                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.06)]">
+                                  <div
+                                    className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300"
+                                    style={{ width: `${pythonProgressPercent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ) : null}
+
                             <section className="overflow-hidden rounded-md border border-[color:var(--border-subtle)] bg-[rgba(15,23,42,0.28)]">
                               <button
                                 type="button"
@@ -2681,21 +3421,24 @@ export default function EditorWorkspace({
                               >
                                 <span className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
                                   <TerminalSquare className="h-4 w-4 text-[var(--accent-primary)]" />
-                                  stdin
+                                  Program input (stdin)
                                 </span>
                                 <span className="inline-flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
-                                  {stdin.length > 0 ? stdinCharacterCountLabel : 'Optional input'}
+                                  {stdin.length > 0 ? stdinCharacterCountLabel : 'Optional'}
                                   {isStdinExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                 </span>
                               </button>
 
                               {isStdinExpanded ? (
                                 <div className="border-t border-[color:var(--border-subtle)] px-4 pb-4 pt-3">
+                                  <div className="mb-2 text-[11px] leading-5 text-[var(--text-muted)]">
+                                    Type the lines your program should read from <code>stdin</code>. Each new line is sent as the next input value.
+                                  </div>
                                   <textarea
                                     value={stdin}
                                     onChange={(event) => setStdin(event.target.value)}
                                     rows={3}
-                                    placeholder="Optional stdin..."
+                                    placeholder={'Example:\nAlice\n42'}
                                     className="w-full resize-none rounded-md border border-[color:var(--border-subtle)] bg-[#0b1020] px-3 py-3 font-mono text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)]"
                                   />
                                   {stdin.length > 0 ? (
@@ -2786,6 +3529,12 @@ export default function EditorWorkspace({
                   : `Copilot-style chat for ${activeFileName}. Use Ctrl/Cmd + Enter to send.`}
               </div>
 
+              <div className="border-b border-[color:var(--border-subtle)] px-4 py-3 text-[11px] leading-5 text-[var(--text-secondary)]">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">Context</div>
+                <div className="mt-2 truncate text-[var(--text-primary)]">{activeFileName}</div>
+                <div className="truncate">{assistSelectionSummary}</div>
+              </div>
+
               <div className="border-b border-[color:var(--border-subtle)] px-4 py-3">
                 <div className="mb-2 text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">Quick prompts</div>
                 <div className="flex flex-wrap gap-2">
@@ -2803,7 +3552,27 @@ export default function EditorWorkspace({
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-[12px] leading-6">
-                {assistLoading ? (
+                {assistMessages.length > 0 ? (
+                  <div className="space-y-3">
+                    {assistMessages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`rounded-2xl border px-3 py-3 ${
+                          message.role === 'assistant'
+                            ? 'border-[rgba(99,102,241,0.18)] bg-[rgba(99,102,241,0.08)]'
+                            : 'border-[color:var(--border-subtle)] bg-[rgba(255,255,255,0.02)]'
+                        }`}
+                      >
+                        <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                          {message.role === 'assistant' ? 'Yantra' : 'You'}
+                        </div>
+                        <pre className="mt-2 whitespace-pre-wrap font-mono text-[12px] text-[var(--text-primary)]">
+                          {message.content}
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
+                ) : assistLoading ? (
                   <div className="flex items-center gap-2 text-[var(--text-secondary)]">
                     <LoaderCircle className="h-4 w-4 animate-spin" />
                     Thinking through your code...
@@ -2812,8 +3581,6 @@ export default function EditorWorkspace({
                   <div className="rounded-xl border border-[rgba(248,113,113,0.35)] bg-[rgba(248,113,113,0.08)] px-3 py-2 text-[var(--red)]">
                     {assistError}
                   </div>
-                ) : assistResponse ? (
-                  <pre className="whitespace-pre-wrap font-mono text-[var(--text-primary)]">{assistResponse}</pre>
                 ) : (
                   <div className="text-[var(--text-muted)]">
                     {devBypass
@@ -2821,9 +3588,41 @@ export default function EditorWorkspace({
                       : 'Ask Yantra to explain code, debug errors, or review the active file.'}
                   </div>
                 )}
+
+                {assistError && assistMessages.length > 0 ? (
+                  <div className="mt-3 rounded-xl border border-[rgba(248,113,113,0.35)] bg-[rgba(248,113,113,0.08)] px-3 py-2 text-[var(--red)]">
+                    {assistError}
+                  </div>
+                ) : null}
+
+                {assistLoading ? (
+                  <div className="mt-3 flex items-center gap-2 text-[var(--text-secondary)]">
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Thinking through your code...
+                  </div>
+                ) : null}
               </div>
 
               <div className="border-t border-[color:var(--border-subtle)] p-4">
+                {assistResponse ? (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="yantra-prompt-chip"
+                      onClick={() => handleInsertAssistSuggestion('insert-at-cursor')}
+                    >
+                      Insert at cursor
+                    </button>
+                    <button
+                      type="button"
+                      className="yantra-prompt-chip"
+                      onClick={() => handleInsertAssistSuggestion('replace-selection')}
+                    >
+                      Replace selection
+                    </button>
+                  </div>
+                ) : null}
+
                 <textarea
                   value={assistQuestion}
                   onChange={(event) => setAssistQuestion(event.target.value)}
@@ -2840,6 +3639,7 @@ export default function EditorWorkspace({
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <div className="min-w-0 text-[11px] text-[var(--text-muted)]">
                     <div className="truncate">{activeFileName}</div>
+                    <div className="truncate">{assistSelectionSummary}</div>
                   </div>
                   <button
                     type="button"
@@ -2905,6 +3705,12 @@ export default function EditorWorkspace({
         shareUrl={shareUrl}
         error={shareError}
         onClose={() => setShareModalOpen(false)}
+      />
+
+      <ShortcutCheatSheet
+        open={showShortcutSheet}
+        onClose={() => setShowShortcutSheet(false)}
+        shortcuts={[...SHORTCUTS]}
       />
 
       <iframe
@@ -3318,6 +4124,42 @@ export default function EditorWorkspace({
         .yantra-ai-button.is-active {
           background: #251550;
           box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.18);
+        }
+
+        .yantra-toolbar-select {
+          appearance: none;
+          background: transparent;
+          border: 0;
+          color: var(--text-primary);
+          font-size: 11px;
+          outline: none;
+          padding-right: 0.5rem;
+        }
+
+        .yantra-toolbar-select option {
+          background: var(--bg-surface);
+          color: var(--text-primary);
+        }
+
+        .yantra-settings-row {
+          align-items: center;
+          background: var(--bg-base);
+          border: 0.5px solid var(--border-subtle);
+          border-radius: 12px;
+          color: var(--text-secondary);
+          display: flex;
+          font-size: 12px;
+          justify-content: space-between;
+          gap: 0.75rem;
+          padding: 10px 12px;
+          text-align: left;
+          width: 100%;
+        }
+
+        .yantra-settings-row:hover,
+        .yantra-settings-row.is-active {
+          border-color: var(--accent-primary);
+          color: var(--text-primary);
         }
 
         .yantra-rail {

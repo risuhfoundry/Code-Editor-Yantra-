@@ -9,6 +9,11 @@
   --site-bg: #040404;
   --site-bg-soft: #080808;
   --site-bg-raised: #101012;
+  --site-accent-cyan: #78e5ff;
+  --site-accent-violet: #9386ff;
+  --site-accent-gold: #f3c47e;
+  --site-accent-rose: #f58db2;
+  --site-accent-emerald: #6df3c6;
   --site-panel: rgba(255, 255, 255, 0.045);
   --site-panel-strong: rgba(255, 255, 255, 0.072);
   --site-border: rgba(255, 255, 255, 0.1);
@@ -57,8 +62,9 @@ body {
 
 html {
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 22%),
-    radial-gradient(circle at 80% 16%, rgba(128, 136, 148, 0.1), transparent 18%),
+    radial-gradient(circle at 18% 10%, rgba(120, 229, 255, 0.16), transparent 22%),
+    radial-gradient(circle at 82% 16%, rgba(147, 134, 255, 0.15), transparent 20%),
+    radial-gradient(circle at 50% 112%, rgba(243, 196, 126, 0.11), transparent 30%),
     linear-gradient(180deg, #020202 0%, #040404 36%, #050607 100%);
 }
 
@@ -128,12 +134,17 @@ button {
 
 .site-panel {
   background:
+    radial-gradient(circle at top left, rgba(120, 229, 255, 0.08), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(147, 134, 255, 0.08), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025)),
     rgba(6, 6, 7, 0.82);
 }
 
 .site-panel-strong {
   background:
+    radial-gradient(circle at top left, rgba(120, 229, 255, 0.11), transparent 28%),
+    radial-gradient(circle at 78% 20%, rgba(147, 134, 255, 0.1), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(243, 196, 126, 0.08), transparent 32%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
     rgba(8, 8, 10, 0.88);
   border-color: var(--site-border-strong);
@@ -147,6 +158,8 @@ button {
   border-radius: inherit;
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 34%),
+    radial-gradient(circle at top right, rgba(120, 229, 255, 0.07), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(147, 134, 255, 0.06), transparent 32%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 34%);
   pointer-events: none;
 }
@@ -162,14 +175,17 @@ button {
   align-items: center;
   gap: 0.65rem;
   border-radius: 999px;
-  border: 1px solid var(--site-border);
-  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(120, 229, 255, 0.16);
+  background:
+    linear-gradient(135deg, rgba(120, 229, 255, 0.09), rgba(147, 134, 255, 0.08), rgba(243, 196, 126, 0.06)),
+    rgba(255, 255, 255, 0.03);
   padding: 0.7rem 1rem;
-  color: var(--site-faint);
+  color: rgba(232, 238, 245, 0.76);
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 10px;
   letter-spacing: 0.28em;
   text-transform: uppercase;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .site-copy {
@@ -179,7 +195,14 @@ button {
 .site-rule {
   height: 1px;
   width: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(120, 229, 255, 0.18),
+    rgba(147, 134, 255, 0.24),
+    rgba(243, 196, 126, 0.18),
+    transparent
+  );
 }
 
 .site-button-primary,
@@ -203,33 +226,33 @@ button {
 }
 
 .site-button-primary {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(232, 228, 219, 0.86));
-  color: #080808;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+  border: 1px solid rgba(120, 229, 255, 0.18);
+  background: linear-gradient(135deg, #7ce7ff 0%, #9e92ff 54%, #f2c585 100%);
+  color: #071017;
+  box-shadow: 0 18px 40px rgba(11, 16, 24, 0.42);
 }
 
 .site-button-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.42);
+  box-shadow: 0 22px 52px rgba(10, 16, 28, 0.5);
 }
 
 .site-button-primary:focus-visible,
 .site-button-secondary:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.72);
+  outline: 1px solid rgba(120, 229, 255, 0.86);
   outline-offset: 4px;
 }
 
 .site-button-secondary {
-  border: 1px solid var(--site-border);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(120, 229, 255, 0.18);
+  background: linear-gradient(135deg, rgba(120, 229, 255, 0.08), rgba(147, 134, 255, 0.06), rgba(255, 255, 255, 0.03));
   color: var(--site-text);
 }
 
 .site-button-secondary:hover {
   transform: translateY(-1px);
-  border-color: var(--site-border-strong);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(147, 134, 255, 0.24);
+  background: linear-gradient(135deg, rgba(120, 229, 255, 0.12), rgba(147, 134, 255, 0.1), rgba(255, 255, 255, 0.05));
 }
 
 .site-glass-hover {
@@ -241,10 +264,92 @@ button {
 
 .site-glass-hover:hover {
   transform: translateY(-4px);
-  border-color: var(--site-border-strong);
+  border-color: rgba(120, 229, 255, 0.22);
   box-shadow:
     0 34px 120px rgba(0, 0, 0, 0.62),
+    0 0 0 1px rgba(147, 134, 255, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.site-icon-frame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.site-icon-frame--cyan {
+  border-color: rgba(120, 229, 255, 0.2);
+  background: linear-gradient(180deg, rgba(120, 229, 255, 0.18), rgba(120, 229, 255, 0.05));
+  color: #7ce7ff;
+}
+
+.site-icon-frame--violet {
+  border-color: rgba(147, 134, 255, 0.22);
+  background: linear-gradient(180deg, rgba(147, 134, 255, 0.18), rgba(147, 134, 255, 0.05));
+  color: #b4a9ff;
+}
+
+.site-icon-frame--gold {
+  border-color: rgba(243, 196, 126, 0.22);
+  background: linear-gradient(180deg, rgba(243, 196, 126, 0.18), rgba(243, 196, 126, 0.05));
+  color: #f3c47e;
+}
+
+.site-icon-frame--rose {
+  border-color: rgba(245, 141, 178, 0.22);
+  background: linear-gradient(180deg, rgba(245, 141, 178, 0.18), rgba(245, 141, 178, 0.05));
+  color: #f5a0c1;
+}
+
+.site-icon-frame--emerald {
+  border-color: rgba(109, 243, 198, 0.2);
+  background: linear-gradient(180deg, rgba(109, 243, 198, 0.18), rgba(109, 243, 198, 0.05));
+  color: #79f3cf;
+}
+
+.site-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.site-chip--cyan {
+  border: 1px solid rgba(120, 229, 255, 0.18);
+  background: linear-gradient(135deg, rgba(120, 229, 255, 0.12), rgba(120, 229, 255, 0.04));
+  color: rgba(163, 238, 255, 0.86);
+}
+
+.site-chip--violet {
+  border: 1px solid rgba(147, 134, 255, 0.2);
+  background: linear-gradient(135deg, rgba(147, 134, 255, 0.13), rgba(147, 134, 255, 0.04));
+  color: rgba(201, 192, 255, 0.86);
+}
+
+.site-chip--gold {
+  border: 1px solid rgba(243, 196, 126, 0.2);
+  background: linear-gradient(135deg, rgba(243, 196, 126, 0.13), rgba(243, 196, 126, 0.04));
+  color: rgba(248, 216, 164, 0.88);
+}
+
+.site-chip--rose {
+  border: 1px solid rgba(245, 141, 178, 0.2);
+  background: linear-gradient(135deg, rgba(245, 141, 178, 0.13), rgba(245, 141, 178, 0.04));
+  color: rgba(255, 218, 231, 0.88);
+}
+
+.site-chip--emerald {
+  border: 1px solid rgba(109, 243, 198, 0.2);
+  background: linear-gradient(135deg, rgba(109, 243, 198, 0.13), rgba(109, 243, 198, 0.04));
+  color: rgba(166, 248, 223, 0.88);
 }
 
 .site-orb {

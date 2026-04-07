@@ -17,6 +17,7 @@ export type MonacoLanguage =
 const YANTRA_THEME_MAP = {
   dark: 'yantra-dark',
   light: 'yantra-light',
+  contrast: 'yantra-contrast',
 } as const;
 
 const LANGUAGE_IDS: Record<MonacoLanguage, string> = {
@@ -359,6 +360,42 @@ export const setupMonaco = (monaco: Monaco) => {
       'editor.wordHighlightBackground': '#6D28D910',
       'editorIndentGuide.background1': '#E5E7EB',
       'editorIndentGuide.activeBackground1': '#6D28D944',
+    },
+  });
+
+  monaco.editor.defineTheme(YANTRA_THEME_MAP.contrast, {
+    base: 'hc-black',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '7DD3FC', fontStyle: 'italic' },
+      { token: 'string', foreground: 'FDE047' },
+      { token: 'keyword', foreground: 'F472B6', fontStyle: 'bold' },
+      { token: 'number', foreground: '22D3EE' },
+      { token: 'function', foreground: 'A78BFA' },
+      { token: 'type.identifier', foreground: 'FFFFFF' },
+    ],
+    colors: {
+      'editor.background': '#000000',
+      'editor.foreground': '#FFFFFF',
+      'editor.lineHighlightBackground': '#111827',
+      'editorCursor.foreground': '#FDE047',
+      'editorLineNumber.foreground': '#60A5FA',
+      'editorLineNumber.activeForeground': '#FFFFFF',
+      'editor.selectionBackground': '#2563EB88',
+      'editor.selectionHighlightBackground': '#1D4ED855',
+      'editor.findMatchBackground': '#FDE04755',
+      'editor.wordHighlightBackground': '#22D3EE33',
+      'editorIndentGuide.background1': '#334155',
+      'editorIndentGuide.activeBackground1': '#FDE047',
+      'editorGutter.background': '#000000',
+      'editorWidget.background': '#050816',
+      'editorWidget.border': '#FDE047',
+      'editorSuggestWidget.background': '#050816',
+      'editorSuggestWidget.border': '#FDE047',
+      'editorSuggestWidget.selectedBackground': '#111827',
+      'editorHoverWidget.background': '#050816',
+      'editorHoverWidget.border': '#FDE047',
+      'focusBorder': '#FDE047',
     },
   });
 

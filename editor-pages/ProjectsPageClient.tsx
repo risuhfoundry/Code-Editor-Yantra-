@@ -3,13 +3,19 @@
 import { startTransition, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, LoaderCircle, Plus, Sparkles } from 'lucide-react';
-import type { EditorProjectDetails, EditorProjectSummary, EditorTemplateKey } from '@/editor/types';
+import { ArrowLeft, Plus, Sparkles } from 'lucide-react';
+import EditorProjectTemplateModal from '@/editor/components/EditorProjectTemplateModal';
+import type { EditorProjectDetails, EditorProjectSummary } from '@/editor/types';
 import {
-  createLocalEditorProject,
+  createLocalEditorProjectFromCreationTemplate,
   listLocalEditorProjects,
   saveLocalEditorProject,
 } from '@/editor/lib/local-dev-projects';
+import {
+  getEditorProjectCreationTemplate,
+  getEditorProjectCreationTemplates,
+  type EditorProjectCreationTemplateId,
+} from '@/editor/lib/project-creation-templates';
 import { PUBLIC_EDITOR_USER } from '@/src/lib/public-mode';
 
 type ProjectsPageClientProps = {
@@ -33,9 +39,10 @@ function formatUpdatedAt(value: string) {
 
 export default function ProjectsPageClient({ initialProjects, devBypass = false }: ProjectsPageClientProps) {
   const router = useRouter();
+  const projectTemplates = getEditorProjectCreationTemplates();
   const [projects, setProjects] = useState(initialProjects);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
-  const [creatingTemplate, setCreatingTemplate] = useState<EditorTemplateKey | null>(null);
+  const [creatingTemplate, setCreatingTemplate] = useState<EditorProjectCreationTemplateId | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,14 +54,17 @@ export default function ProjectsPageClient({ initialProjects, devBypass = false 
     setProjects(listLocalEditorProjects());
   }, [devBypass, initialProjects]);
 
-  async function createProject(templateKey: EditorTemplateKey) {
-    setCreatingTemplate(templateKey);
+  async function createProject(templateId: EditorProjectCreationTemplateId) {
+    const template = getEditorProjectCreationTemplate(templateId);
+
+    setCreatingTemplate(templateId);
     setCreateError(null);
 
     try {
       if (devBypass) {
-        const created = saveLocalEditorProject(createLocalEditorProject(templateKey, PUBLIC_EDITOR_USER.id));
+        const created = saveLocalEditorProject(createLocalEditorProjectFromCreationTemplate(templateId, PUBLIC_EDITOR_USER.id));
         setProjects(listLocalEditorProjects());
+        setTemplatePickerOpen(false);
 
         startTransition(() => {
           router.push(`/editor?projectId=${created.project.id}`);
@@ -68,10 +78,24 @@ export default function ProjectsPageClient({ initialProjects, devBypass = false 
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ templateKey }),
+          body: JSON.stringify({
+            templateKey: template.templateKey,
+            title: template.title,
+          }),
         }),
       );
 
+      await readJson<{ files: unknown[] }>(
+        await fetch(`/api/editor/projects/${created.project.id}/files`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(template.files),
+        }),
+      );
+
+      setTemplatePickerOpen(false);
       startTransition(() => {
         router.push(`/editor?projectId=${created.project.id}`);
       });
@@ -97,8 +121,8 @@ export default function ProjectsPageClient({ initialProjects, devBypass = false 
             <h1 className="mt-4 font-display text-[3rem] leading-[0.9] tracking-tight text-white">Your playgrounds</h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/58">
               {devBypass
-                ? 'Your projects now save locally on this device. Start a fresh Python, JavaScript, or web playground whenever you want.'
-                : 'Jump back into a saved project or start a fresh Python, JavaScript, or web playground.'}
+                ? 'Your projects now save locally on this device. Start with data science, landing pages, React-style UI, or an API client whenever you want.'
+                : 'Jump back into a saved project or create a fresh project from a richer starter template.'}
             </p>
           </div>
 
@@ -113,7 +137,10 @@ export default function ProjectsPageClient({ initialProjects, devBypass = false 
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-black transition-transform hover:scale-[0.99]"
-              onClick={() => setTemplatePickerOpen((current) => !current)}
+              onClick={() => {
+                setCreateError(null);
+                setTemplatePickerOpen(true);
+              }}
             >
               <Plus className="h-4 w-4" />
               New Project
@@ -121,72 +148,12 @@ export default function ProjectsPageClient({ initialProjects, devBypass = false 
           </div>
         </header>
 
-        {templatePickerOpen ? (
-          <section className="mt-5 rounded-[2rem] border border-white/8 bg-white/[0.03] p-5 shadow-[0_20px_64px_rgba(0,0,0,0.28)] backdrop-blur-[24px]">
-            <div className="grid gap-4 md:grid-cols-3">
-              <button
-                type="button"
-                className="rounded-[1.6rem] border border-white/8 bg-black/28 p-5 text-left transition hover:border-white/16 hover:bg-white/[0.05]"
-                onClick={() => {
-                  void createProject('python-playground');
-                }}
-                disabled={creatingTemplate !== null}
-              >
-                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/42">Template</div>
-                <div className="mt-3 text-2xl font-semibold tracking-tight text-white">Python Playground</div>
-                <p className="mt-2 text-sm leading-relaxed text-white/58">Single-file Python project using the in-browser Pyodide runtime.</p>
-                <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.22em] text-white/42">
-                  {creatingTemplate === 'python-playground' ? 'Creating...' : 'main.py ready'}
-                </div>
-              </button>
-
-              <button
-                type="button"
-                className="rounded-[1.6rem] border border-white/8 bg-black/28 p-5 text-left transition hover:border-white/16 hover:bg-white/[0.05]"
-                onClick={() => {
-                  void createProject('js-playground');
-                }}
-                disabled={creatingTemplate !== null}
-              >
-                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/42">Template</div>
-                <div className="mt-3 text-2xl font-semibold tracking-tight text-white">JavaScript Playground</div>
-                <p className="mt-2 text-sm leading-relaxed text-white/58">Single-file JavaScript starter with in-browser console capture on Run.</p>
-                <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.22em] text-white/42">
-                  {creatingTemplate === 'js-playground' ? 'Creating...' : 'script.js ready'}
-                </div>
-              </button>
-
-              <button
-                type="button"
-                className="rounded-[1.6rem] border border-white/8 bg-black/28 p-5 text-left transition hover:border-white/16 hover:bg-white/[0.05]"
-                onClick={() => {
-                  void createProject('web-playground');
-                }}
-                disabled={creatingTemplate !== null}
-              >
-                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/42">Template</div>
-                <div className="mt-3 text-2xl font-semibold tracking-tight text-white">Web Playground</div>
-                <p className="mt-2 text-sm leading-relaxed text-white/58">HTML, CSS, and JavaScript starter files with live iframe preview on Run.</p>
-                <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.22em] text-white/42">
-                  {creatingTemplate === 'web-playground' ? 'Creating...' : 'index.html + style.css + script.js'}
-                </div>
-              </button>
-            </div>
-
-            {createError ? (
-              <div className="mt-4 rounded-[1.4rem] border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
-                {createError}
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
         <section className="mt-5">
           {projects.length === 0 ? (
             <div className="rounded-[2rem] border border-dashed border-white/12 bg-white/[0.02] p-8 text-center text-white/62">
               <div className="font-display text-3xl tracking-tight text-white">No saved projects yet</div>
               <p className="mt-3 text-sm leading-relaxed">
-                Open the template selector above to create your first Yantra playground.
+                Open the template modal above to create your first Yantra project.
               </p>
             </div>
           ) : (
@@ -204,7 +171,6 @@ export default function ProjectsPageClient({ initialProjects, devBypass = false 
                         {project.title}
                       </h2>
                     </div>
-                    {creatingTemplate === project.templateKey ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
                   </div>
 
                   <div className="mt-5 rounded-[1.4rem] border border-white/8 bg-black/28 p-4">
@@ -217,6 +183,23 @@ export default function ProjectsPageClient({ initialProjects, devBypass = false 
           )}
         </section>
       </div>
+
+      <EditorProjectTemplateModal
+        open={templatePickerOpen}
+        templates={projectTemplates}
+        creatingTemplateId={creatingTemplate}
+        error={createError}
+        onClose={() => {
+          if (creatingTemplate !== null) {
+            return;
+          }
+
+          setTemplatePickerOpen(false);
+        }}
+        onSelectTemplate={(templateId) => {
+          void createProject(templateId);
+        }}
+      />
     </div>
   );
 }

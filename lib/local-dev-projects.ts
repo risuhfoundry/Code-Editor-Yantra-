@@ -1,8 +1,12 @@
 import { getEditorProjectTemplate } from './project-templates';
+import { getEditorProjectCreationTemplate, type EditorProjectCreationTemplateId } from './project-creation-templates';
+import { getEditorStarterTemplate } from './starter-templates';
 import type {
   EditorProjectDetails,
   EditorProjectFile,
+  EditorProjectFileInput,
   EditorProjectSummary,
+  EditorStarterTemplateId,
   EditorTemplateKey,
 } from '@/editor/types';
 
@@ -15,6 +19,7 @@ type BuildLocalEditorProjectOptions = {
   templateKey: EditorTemplateKey;
   title?: string;
   timestamp?: string;
+  files?: EditorProjectFileInput[];
 };
 
 function canUseBrowserStorage() {
@@ -66,8 +71,10 @@ export function buildLocalEditorProject({
   templateKey,
   title,
   timestamp = createTimestamp(),
+  files: sourceFiles,
 }: BuildLocalEditorProjectOptions): EditorProjectDetails {
   const template = getEditorProjectTemplate(templateKey);
+  const files = sourceFiles ?? template.files;
 
   const project: EditorProjectSummary = {
     id: projectId,
@@ -79,7 +86,7 @@ export function buildLocalEditorProject({
     updatedAt: timestamp,
   };
 
-  const files: EditorProjectFile[] = template.files.map((file) => ({
+  const projectFiles: EditorProjectFile[] = files.map((file) => ({
     id: createId('local-file'),
     projectId,
     path: file.path,
@@ -93,7 +100,7 @@ export function buildLocalEditorProject({
 
   return {
     project,
-    files,
+    files: projectFiles,
   };
 }
 
@@ -103,6 +110,36 @@ export function createLocalEditorProject(templateKey: EditorTemplateKey, userId:
     userId,
     templateKey,
     title,
+  });
+}
+
+export function createLocalEditorProjectFromCreationTemplate(
+  creationTemplateId: EditorProjectCreationTemplateId,
+  userId: string,
+): EditorProjectDetails {
+  const creationTemplate = getEditorProjectCreationTemplate(creationTemplateId);
+
+  return buildLocalEditorProject({
+    projectId: createId('local-project'),
+    userId,
+    templateKey: creationTemplate.templateKey,
+    title: creationTemplate.title,
+    files: creationTemplate.files,
+  });
+}
+
+export function createLocalEditorProjectFromStarterTemplate(
+  starterTemplateId: EditorStarterTemplateId,
+  userId: string,
+): EditorProjectDetails {
+  const starterTemplate = getEditorStarterTemplate(starterTemplateId);
+
+  return buildLocalEditorProject({
+    projectId: createId('local-project'),
+    userId,
+    templateKey: starterTemplate.templateKey,
+    title: starterTemplate.title,
+    files: starterTemplate.files,
   });
 }
 

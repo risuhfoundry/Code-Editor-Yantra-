@@ -1,6 +1,7 @@
 import type { StudentProfile } from '@/src/features/dashboard/student-profile-model';
 
 export type EditorTemplateKey = 'python-playground' | 'web-playground' | 'js-playground';
+export type EditorStarterTemplateId = 'hello-world' | 'data-chart' | 'api-fetch' | 'mini-game';
 
 export type EditorFileLanguage =
   | 'python'
